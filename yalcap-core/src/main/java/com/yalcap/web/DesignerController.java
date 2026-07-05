@@ -1,14 +1,15 @@
 package com.yalcap.web;
 
-import com.yalcap.form.FormArtifactEntity;
-import com.yalcap.form.FormArtifactService;
-import com.yalcap.manifest.WorkflowManifestEntity;
-import com.yalcap.manifest.WorkflowManifestService;
+import com.yalcap.definition.form.FormDefinitionEntity;
+import com.yalcap.definition.form.FormDefinitionService;
+import com.yalcap.definition.workflow.WorkflowDefinitionEntity;
+import com.yalcap.definition.workflow.WorkflowDefinitionService;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,76 +19,87 @@ import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Scanner;
+import java.util.UUID;
 
 @Controller
-@RequestMapping("/designer")
+@RequestMapping({"/designer", "/t/{tenantId}/designer"})
 public class DesignerController {
 
-    private final FormArtifactService formArtifactService;
-    private final WorkflowManifestService manifestService;
+    private final FormDefinitionService formDefinitionService;
+    private final WorkflowDefinitionService definitionService;
     private final ObjectMapper objectMapper;
 
-    public DesignerController(FormArtifactService formArtifactService,
-                              WorkflowManifestService manifestService,
+    public DesignerController(FormDefinitionService formDefinitionService,
+                              WorkflowDefinitionService definitionService,
                               ObjectMapper objectMapper) {
-        this.formArtifactService = formArtifactService;
-        this.manifestService = manifestService;
+        this.formDefinitionService = formDefinitionService;
+        this.definitionService = definitionService;
         this.objectMapper = objectMapper;
     }
 
     @GetMapping
-    public String designerPage(Model model) throws Exception {
-        String manifestKey = "example-review";
-        model.addAttribute("manifestKey", manifestKey);
-        seedExampleManifest(manifestKey);
+    public String designerPage(@PathVariable(value = "tenantId", required = false) UUID tenantId, Model model) throws Exception {
+        String definitionKey = "example-review";
+        putDefinitionKey(model, definitionKey);
+        model.addAttribute("tenantId", tenantId);
+        seedExampleDefinition(definitionKey);
         return "designer";
     }
 
     @GetMapping("/active")
-    public String activeManifest(@RequestParam String manifestKey, Model model) {
-        model.addAttribute("manifestKey", manifestKey);
-        manifestService.getActiveManifest(manifestKey).ifPresent(entity -> model.addAttribute("activeManifest", entity));
+    public String activeDefinition(@PathVariable(value = "tenantId", required = false) UUID tenantId,
+                                 @RequestParam String definitionKey,
+                                 Model model) {
+        putDefinitionKey(model, definitionKey);
+        model.addAttribute("tenantId", tenantId);
+        definitionService.getActiveDefinition(definitionKey).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
         return "designer/active :: content";
     }
 
     @GetMapping("/history")
-    public String manifestHistory(@RequestParam String manifestKey, Model model) {
-        model.addAttribute("manifestKey", manifestKey);
-        List<WorkflowManifestEntity> history = manifestService.getManifestHistory(manifestKey);
+    public String definitionHistory(@PathVariable(value = "tenantId", required = false) UUID tenantId,
+                                  @RequestParam String definitionKey,
+                                  Model model) {
+        putDefinitionKey(model, definitionKey);
+        model.addAttribute("tenantId", tenantId);
+        List<WorkflowDefinitionEntity> history = definitionService.getDefinitionHistory(definitionKey);
         model.addAttribute("history", history);
         return "designer/history :: content";
     }
 
     @PostMapping("/publish")
-    public String publishManifest(@ModelAttribute PublishManifestForm form, Model model) throws Exception {
-        JsonNode manifest = objectMapper.readTree(form.getManifest());
-        model.addAttribute("manifestKey", form.getManifestKey());
+    public String publishDefinition(@PathVariable(value = "tenantId", required = false) UUID tenantId,
+                                  @ModelAttribute PublishDefinitionForm form,
+                                  Model model) throws Exception {
+        JsonNode definition = objectMapper.readTree(form.getDefinition());
+        putDefinitionKey(model, form.getDefinitionKey());
+        model.addAttribute("tenantId", tenantId);
         try {
-            String kind = manifest.path("kind").asString("").trim();
+            String kind = definition.path("kind").asString("").trim();
             if ("form".equals(kind)) {
-                FormArtifactEntity publishedForm = formArtifactService.publish(
-                        form.getManifestKey(),
-                        manifest,
+                FormDefinitionEntity publishedForm = formDefinitionService.publish(
+                        form.getDefinitionKey(),
+                        definition,
                         form.getCreatedBy(),
                         form.getChangeMessage()
                 );
-                model.addAttribute("activeManifest", publishedForm);
+                model.addAttribute("activeDefinition", publishedForm);
             } else {
-                WorkflowManifestEntity published = manifestService.publish(
-                        form.getManifestKey(),
-                        manifest,
+                WorkflowDefinitionEntity published = definitionService.publishDefinition(
+                        form.getDefinitionKey(),
+                        definition,
                         form.getCreatedBy(),
                         form.getChangeMessage()
                 );
-                model.addAttribute("activeManifest", published);
+                model.addAttribute("activeDefinition", published);
             }
             model.addAttribute("publishSuccess", true);
         } catch (IllegalArgumentException ex) {
-            String kind = manifest.path("kind").asString("").trim();
+            String kind = definition.path("kind").asString("").trim();
             if ("form".equals(kind)) {
-                formArtifactService.getActiveForm(form.getManifestKey()).ifPresent(entity -> model.addAttribute("activeManifest", entity));
+                formDefinitionService.getActiveForm(form.getDefinitionKey()).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
             } else {
-                manifestService.getActiveManifest(form.getManifestKey()).ifPresent(entity -> model.addAttribute("activeManifest", entity));
+                definitionService.getActiveDefinition(form.getDefinitionKey()).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
             }
             model.addAttribute("publishError", ex.getMessage());
         }
@@ -95,44 +107,51 @@ public class DesignerController {
     }
 
     @GetMapping("/form")
-    public String formDesigner(@RequestParam(required = false) String manifestKey, Model model) throws Exception {
-        String key = manifestKey != null ? manifestKey : "example-review";
-        model.addAttribute("manifestKey", key);
-        formArtifactService.getActiveForm(key).ifPresent(entity -> model.addAttribute("activeManifest", entity));
+    public String formDesigner(@PathVariable(value = "tenantId", required = false) UUID tenantId,
+                               @RequestParam(required = false) String definitionKey,
+                               Model model) throws Exception {
+        String key = definitionKey != null ? definitionKey : "example-review";
+        putDefinitionKey(model, key);
+        model.addAttribute("tenantId", tenantId);
+        formDefinitionService.getActiveForm(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
         return "designer/form";
     }
 
-    private void seedExampleManifest(String manifestKey) throws Exception {
-        if (manifestService.getActiveManifest(manifestKey).isEmpty()) {
+    private void seedExampleDefinition(String definitionKey) throws Exception {
+        if (definitionService.getActiveDefinition(definitionKey).isEmpty()) {
             ClassPathResource resource = new ClassPathResource("manifests/example-review-manifest.json");
             try (Scanner scanner = new Scanner(resource.getInputStream(), StandardCharsets.UTF_8.name())) {
                 String content = scanner.useDelimiter("\\A").hasNext() ? scanner.next() : "";
-                JsonNode manifest = objectMapper.readTree(content);
-                manifestService.publish(manifestKey, manifest, "system", "Seed example manifest");
+                JsonNode definition = objectMapper.readTree(content);
+                definitionService.publishDefinition(definitionKey, definition, "system", "Seed example definition");
             }
         }
     }
 
-    public static class PublishManifestForm {
-        private String manifestKey;
-        private String manifest;
+    private void putDefinitionKey(Model model, String definitionKey) {
+        model.addAttribute("definitionKey", definitionKey);
+    }
+
+    public static class PublishDefinitionForm {
+        private String definitionKey;
+        private String definition;
         private String createdBy;
         private String changeMessage;
 
-        public String getManifestKey() {
-            return manifestKey;
+        public String getDefinitionKey() {
+            return definitionKey;
         }
 
-        public void setManifestKey(String manifestKey) {
-            this.manifestKey = manifestKey;
+        public void setDefinitionKey(String definitionKey) {
+            this.definitionKey = definitionKey;
         }
 
-        public String getManifest() {
-            return manifest;
+        public String getDefinition() {
+            return definition;
         }
 
-        public void setManifest(String manifest) {
-            this.manifest = manifest;
+        public void setDefinition(String definition) {
+            this.definition = definition;
         }
 
         public String getCreatedBy() {

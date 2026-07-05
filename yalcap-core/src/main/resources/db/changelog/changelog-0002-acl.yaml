@@ -1,0 +1,515 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0014-create-project-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: project
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: project_key
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(200)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(1000)
+              - column:
+                  name: created_by
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: project
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_project_tenant
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_project_tenant_key ON project (tenant_id, project_key);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_project_tenant_name ON project (tenant_id, name);
+        - sql:
+            sql: ALTER TABLE project ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY project_tenant_isolation ON project
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0015-create-resource-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: resource
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: project_id
+                  type: uuid
+              - column:
+                  name: resource_type
+                  type: varchar(40)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_key
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_name
+                  type: varchar(200)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lifecycle_state
+                  type: varchar(40)
+                  defaultValue: DRAFT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: resource
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_resource_tenant
+        - addForeignKeyConstraint:
+            baseTableName: resource
+            baseColumnNames: project_id
+            referencedTableName: project
+            referencedColumnNames: id
+            constraintName: fk_resource_project
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_resource_tenant_type_key ON resource (tenant_id, resource_type, resource_key);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_resource_tenant_project_type ON resource (tenant_id, project_id, resource_type);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_resource_tenant_state ON resource (tenant_id, lifecycle_state);
+        - sql:
+            sql: ALTER TABLE resource ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY resource_tenant_isolation ON resource
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0016-create-principal-group-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: principal_group
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: group_key
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: principal_group
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_principal_group_tenant
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_principal_group_tenant_key ON principal_group (tenant_id, group_key);
+        - sql:
+            sql: ALTER TABLE principal_group ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY principal_group_tenant_isolation ON principal_group
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0017-create-group-member-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: group_member
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: group_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_key
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: group_member
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_group_member_tenant
+        - addForeignKeyConstraint:
+            baseTableName: group_member
+            baseColumnNames: group_id
+            referencedTableName: principal_group
+            referencedColumnNames: id
+            constraintName: fk_group_member_group
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_group_member_tenant_group_user ON group_member (tenant_id, group_id, user_key);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_group_member_tenant_user ON group_member (tenant_id, user_key);
+        - sql:
+            sql: ALTER TABLE group_member ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY group_member_tenant_isolation ON group_member
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0018-create-role-definition-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: role_definition
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_key
+                  type: varchar(80)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scope_type
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: role_definition
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_role_definition_tenant
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_definition_tenant_key ON role_definition (tenant_id, role_key);
+        - sql:
+            sql: ALTER TABLE role_definition ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY role_definition_tenant_isolation ON role_definition
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0019-create-role-permission-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: role_permission
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: permission_key
+                  type: varchar(80)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: role_permission
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_role_permission_tenant
+        - addForeignKeyConstraint:
+            baseTableName: role_permission
+            baseColumnNames: role_id
+            referencedTableName: role_definition
+            referencedColumnNames: id
+            constraintName: fk_role_permission_role
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_permission_tenant_role_permission ON role_permission (tenant_id, role_id, permission_key);
+        - sql:
+            sql: ALTER TABLE role_permission ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY role_permission_tenant_isolation ON role_permission
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0020-create-role-assignment-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: role_assignment
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scope_resource_id
+                  type: uuid
+              - column:
+                  name: principal_type
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: principal_key
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: granted_by
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: granted_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: expires_at
+                  type: timestamp with time zone
+        - addForeignKeyConstraint:
+            baseTableName: role_assignment
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_role_assignment_tenant
+        - addForeignKeyConstraint:
+            baseTableName: role_assignment
+            baseColumnNames: scope_resource_id
+            referencedTableName: resource
+            referencedColumnNames: id
+            constraintName: fk_role_assignment_scope_resource
+        - addForeignKeyConstraint:
+            baseTableName: role_assignment
+            baseColumnNames: role_id
+            referencedTableName: role_definition
+            referencedColumnNames: id
+            constraintName: fk_role_assignment_role
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_assignment_tenant_scope_principal_role ON role_assignment (tenant_id, scope_resource_id, principal_type, principal_key, role_id);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_role_assignment_tenant_principal ON role_assignment (tenant_id, principal_type, principal_key);
+        - sql:
+            sql: ALTER TABLE role_assignment ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY role_assignment_tenant_isolation ON role_assignment
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0021-create-resource-grant-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: resource_grant
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: principal_type
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: principal_key
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: permission_key
+                  type: varchar(80)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: effect
+                  type: varchar(10)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: granted_by
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: granted_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: expires_at
+                  type: timestamp with time zone
+        - addForeignKeyConstraint:
+            baseTableName: resource_grant
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_resource_grant_tenant
+        - addForeignKeyConstraint:
+            baseTableName: resource_grant
+            baseColumnNames: resource_id
+            referencedTableName: resource
+            referencedColumnNames: id
+            constraintName: fk_resource_grant_resource
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_resource_grant_tenant_resource_principal_permission ON resource_grant (tenant_id, resource_id, principal_type, principal_key, permission_key);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_resource_grant_tenant_principal_resource ON resource_grant (tenant_id, principal_type, principal_key, resource_id);
+        - sql:
+            sql: ALTER TABLE resource_grant ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY resource_grant_tenant_isolation ON resource_grant
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);

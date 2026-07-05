@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Table("workflow_instance")
-public class WorkflowInstanceEntity {
+public class WorkflowInstanceEntity implements TenantAware {
 
     @Id
     private UUID id;
@@ -20,7 +20,8 @@ public class WorkflowInstanceEntity {
     @Column("tenant_id")
     private UUID tenantId;
 
-    private UUID manifestId;
+    @Column("definition_id")
+    private UUID definitionId;
 
     private JsonNode data;
 
@@ -35,17 +36,19 @@ public class WorkflowInstanceEntity {
 
     public WorkflowInstanceEntity() {}
 
-    public WorkflowInstanceEntity(UUID id, UUID manifestId) {
+    public WorkflowInstanceEntity(UUID id, UUID definitionId) {
         this.id = id;
-        this.manifestId = manifestId;
+        this.definitionId = definitionId;
     }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
     public UUID getTenantId() { return tenantId; }
     public void setTenantId(UUID tenantId) { this.tenantId = tenantId; }
-    public UUID getManifestId() { return manifestId; }
-    public void setManifestId(UUID manifestId) { this.manifestId = manifestId; }
+    public UUID getDefinitionId() { return definitionId; }
+    public void setDefinitionId(UUID definitionId) { this.definitionId = definitionId; }
+    public UUID getManifestId() { return getDefinitionId(); }
+    public void setManifestId(UUID manifestId) { setDefinitionId(manifestId); }
     public JsonNode getData() { return data; }
     public void setData(JsonNode data) { this.data = data; }
     public int getCurrentStep() { return currentStep; }

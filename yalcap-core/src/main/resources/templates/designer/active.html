@@ -1,5 +1,5 @@
-<div id="active-manifest" class="active-manifest">
-    <h2>Active manifest for <span th:text="${manifestKey}">manifestKey</span></h2>
+<div id="active-definition" class="active-manifest">
+    <h2>Active definition for <span th:text="${definitionKey}">definitionKey</span></h2>
 
     <div th:if="${publishSuccess}">
         <strong>Published successfully.</strong>
@@ -9,16 +9,16 @@
         <strong th:text="${publishError}">Publish validation failed.</strong>
     </div>
 
-    <div th:if="${activeManifest == null}">
-        <p>No active manifest found for this key.</p>
+    <div th:if="${activeDefinition == null}">
+        <p>No active definition found for this key.</p>
     </div>
 
-    <div th:if="${activeManifest != null}">
-        <p><strong>Version:</strong> <span th:text="${activeManifest.versionNumber}">1</span></p>
-        <p><strong>Created by:</strong> <span th:text="${activeManifest.createdBy}">creator</span></p>
-        <p><strong>Created at:</strong> <span th:text="${activeManifest.createdAt}">timestamp</span></p>
-        <p><strong>Change message:</strong> <span th:text="${activeManifest.changeMessage}">message</span></p>
-        <h3>Artifact JSON</h3>
-        <pre th:text="${activeManifest.manifest != null ? activeManifest.manifest : activeManifest.artifact}"></pre>
+    <div th:if="${activeDefinition != null}">
+        <p><strong>Version:</strong> <span th:text="${activeDefinition.versionNumber}">1</span></p>
+        <p><strong>Created by:</strong> <span th:text="${activeDefinition.createdBy}">creator</span></p>
+        <p><strong>Created at:</strong> <span th:text="${activeDefinition.createdAt}">timestamp</span></p>
+        <p><strong>Change message:</strong> <span th:text="${activeDefinition.changeMessage}">message</span></p>
+        <h3>Definition JSON</h3>
+        <pre th:text="${activeDefinition.definition}"></pre>
     </div>
 </div>

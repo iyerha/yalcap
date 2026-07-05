@@ -2,7 +2,7 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8" />
-    <title>Yalcap Manifest Designer</title>
+    <title>Yalcap Definition Designer</title>
             <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
                 integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
                 crossorigin="anonymous"></script>
@@ -17,30 +17,30 @@
     </style>
 </head>
 <body>
-    <h1>Yalcap Manifest Designer</h1>
+    <h1>Yalcap Definition Designer</h1>
 
     <section>
-        <label for="manifest-key">Manifest key</label>
-        <input id="manifest-key" name="manifestKey" th:value="${manifestKey}" style="width: 320px; margin-left: 12px;" />
-        <button hx-get="/designer/active" hx-trigger="click" hx-target="#active-manifest" hx-swap="outerHTML" hx-include="#manifest-key">Load active</button>
-        <button hx-get="/designer/history" hx-trigger="click" hx-target="#history" hx-swap="outerHTML" hx-include="#manifest-key">Load history</button>
+        <label for="definition-key">Definition key</label>
+        <input id="definition-key" name="definitionKey" th:value="${definitionKey}" style="width: 320px; margin-left: 12px;" />
+        <button hx-get="/designer/active" hx-trigger="click" hx-target="#active-definition" hx-swap="outerHTML" hx-include="#definition-key">Load active</button>
+        <button hx-get="/designer/history" hx-trigger="click" hx-target="#history" hx-swap="outerHTML" hx-include="#definition-key">Load history</button>
     </section>
 
-    <section id="active-manifest" hx-get="/designer/active" hx-trigger="load" hx-target="#active-manifest" hx-swap="outerHTML" hx-include="#manifest-key">
-        <div>Loading active manifest…</div>
+    <section id="active-definition" hx-get="/designer/active" hx-trigger="load" hx-target="#active-definition" hx-swap="outerHTML" hx-include="#definition-key">
+        <div>Loading active definition…</div>
     </section>
 
-    <section id="history" hx-get="/designer/history" hx-trigger="load" hx-target="#history" hx-swap="outerHTML" hx-include="#manifest-key">
-        <div>Loading manifest history…</div>
+    <section id="history" hx-get="/designer/history" hx-trigger="load" hx-target="#history" hx-swap="outerHTML" hx-include="#definition-key">
+        <div>Loading definition history…</div>
     </section>
 
     <section>
-        <h2>Publish new manifest</h2>
-        <form id="publish-form" hx-post="/designer/publish" hx-target="#active-manifest" hx-swap="outerHTML" hx-include="#manifest-key">
-            <input type="hidden" name="manifestKey" th:value="${manifestKey}" id="publish-manifest-key" />
+        <h2>Publish new definition</h2>
+        <form id="publish-form" hx-post="/designer/publish" hx-target="#active-definition" hx-swap="outerHTML" hx-include="#definition-key">
+            <input type="hidden" name="definitionKey" th:value="${definitionKey}" id="publish-definition-key" />
             <div>
-                <label for="manifest-body">Manifest JSON</label>
-                <textarea id="manifest-body" name="manifest" placeholder='{"steps": [...]}'></textarea>
+                <label for="definition-body">Definition JSON</label>
+                <textarea id="definition-body" name="definition" placeholder='{"steps": [...]}'></textarea>
             </div>
             <div>
                 <label for="created-by">Created by</label>
@@ -48,9 +48,9 @@
             </div>
             <div>
                 <label for="change-message">Change message</label>
-                <input id="change-message" name="changeMessage" value="Initial manifest publish" style="width: 100%;" />
+                <input id="change-message" name="changeMessage" value="Initial definition publish" style="width: 100%;" />
             </div>
-            <button type="submit">Publish manifest</button>
+            <button type="submit">Publish definition</button>
         </form>
     </section>
 </body>

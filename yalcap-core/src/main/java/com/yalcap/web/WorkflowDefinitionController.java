@@ -1,7 +1,7 @@
 package com.yalcap.web;
 
-import com.yalcap.manifest.WorkflowManifestEntity;
-import com.yalcap.manifest.WorkflowManifestService;
+import com.yalcap.definition.workflow.WorkflowDefinitionEntity;
+import com.yalcap.definition.workflow.WorkflowDefinitionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,37 +16,37 @@ import java.util.List;
 import java.util.Map;
 
 @Controller
-@RequestMapping("/api/manifests")
-public class WorkflowManifestController {
+@RequestMapping("/api/definitions")
+public class WorkflowDefinitionController {
 
-    private final WorkflowManifestService manifestService;
+    private final WorkflowDefinitionService definitionService;
 
-    public WorkflowManifestController(WorkflowManifestService manifestService) {
-        this.manifestService = manifestService;
+    public WorkflowDefinitionController(WorkflowDefinitionService definitionService) {
+        this.definitionService = definitionService;
     }
 
-    @GetMapping("/{manifestKey}")
+    @GetMapping("/{definitionKey}")
     @ResponseBody
-    public ResponseEntity<WorkflowManifestEntity> getActiveManifest(@PathVariable String manifestKey) {
-        return manifestService.getActiveManifest(manifestKey)
+    public ResponseEntity<WorkflowDefinitionEntity> getActiveDefinition(@PathVariable String definitionKey) {
+        return definitionService.getActiveDefinition(definitionKey)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/{manifestKey}/history")
+    @GetMapping("/{definitionKey}/history")
     @ResponseBody
-    public ResponseEntity<List<WorkflowManifestEntity>> getManifestHistory(@PathVariable String manifestKey) {
-        return ResponseEntity.ok(manifestService.getManifestHistory(manifestKey));
+    public ResponseEntity<List<WorkflowDefinitionEntity>> getDefinitionHistory(@PathVariable String definitionKey) {
+        return ResponseEntity.ok(definitionService.getDefinitionHistory(definitionKey));
     }
 
-    @PostMapping("/{manifestKey}/publish")
+    @PostMapping("/{definitionKey}/publish")
     @ResponseBody
-    public ResponseEntity<?> publishManifest(@PathVariable String manifestKey,
-                                             @RequestBody PublishManifestRequest request) {
+    public ResponseEntity<?> publishDefinition(@PathVariable String definitionKey,
+                                             @RequestBody PublishDefinitionRequest request) {
         try {
-            WorkflowManifestEntity published = manifestService.publish(
-                    manifestKey,
-                    request.getManifest(),
+            WorkflowDefinitionEntity published = definitionService.publishDefinition(
+                    definitionKey,
+                    request.getDefinition(),
                     request.getCreatedBy(),
                     request.getChangeMessage()
             );
@@ -56,17 +56,17 @@ public class WorkflowManifestController {
         }
     }
 
-    public static class PublishManifestRequest {
-        private JsonNode manifest;
+    public static class PublishDefinitionRequest {
+        private JsonNode definition;
         private String createdBy;
         private String changeMessage;
 
-        public JsonNode getManifest() {
-            return manifest;
+        public JsonNode getDefinition() {
+            return definition;
         }
 
-        public void setManifest(JsonNode manifest) {
-            this.manifest = manifest;
+        public void setDefinition(JsonNode definition) {
+            this.definition = definition;
         }
 
         public String getCreatedBy() {

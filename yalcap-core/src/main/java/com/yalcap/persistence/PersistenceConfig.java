@@ -5,16 +5,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.convert.Jsr310Converters;
 import org.springframework.data.jdbc.core.convert.JdbcCustomConversions;
+import org.springframework.data.jdbc.core.mapping.JdbcValue;
 import org.springframework.data.relational.core.mapping.event.BeforeConvertCallback;
 import org.springframework.data.convert.ReadingConverter;
 import org.springframework.data.convert.WritingConverter;
 
-import com.yalcap.manifest.WorkflowManifestEntity;
-import com.yalcap.form.FormArtifactEntity;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.postgresql.util.PGobject;
 
+import java.sql.JDBCType;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -27,6 +27,7 @@ public class PersistenceConfig {
     public JdbcCustomConversions jdbcCustomConversions(ObjectMapper objectMapper) {
         List<Converter<?, ?>> converters = new ArrayList<>();
         converters.add(new JsonNodeWritingConverter(objectMapper));
+        converters.add(new PgObjectToJsonNodeReadingConverter(objectMapper));
         converters.add(new JsonNodeReadingConverter(objectMapper));
         converters.add(new TimestampToOffsetDateTimeConverter());
         converters.add(new OffsetDateTimeToTimestampConverter());
@@ -36,41 +37,24 @@ public class PersistenceConfig {
     }
 
     @Bean
-    public BeforeConvertCallback<WorkflowInstanceEntity> setTenantBeforeConvert() {
+    public BeforeConvertCallback<TenantAware> setTenantBeforeConvert() {
         return entity -> {
-            TenantContext.getTenantId().ifPresent(entity::setTenantId);
-            return entity;
-        };
-    }
-
-    @Bean
-    public BeforeConvertCallback<WorkflowManifestEntity> setManifestTenantBeforeConvert() {
-        return entity -> {
-            TenantContext.getTenantId().ifPresent(entity::setTenantId);
-            return entity;
-        };
-    }
-
-    @Bean
-    public BeforeConvertCallback<FormArtifactEntity> setFormArtifactTenantBeforeConvert() {
-        return entity -> {
-            TenantContext.getTenantId().ifPresent(entity::setTenantId);
+            if (entity.getTenantId() == null) {
+                TenantContext.getTenantId().ifPresent(entity::setTenantId);
+            }
             return entity;
         };
     }
 
     @WritingConverter
-    static class JsonNodeWritingConverter implements Converter<JsonNode, PGobject> {
+    static class JsonNodeWritingConverter implements Converter<JsonNode, JdbcValue> {
         private final ObjectMapper mapper;
         public JsonNodeWritingConverter(ObjectMapper mapper) { this.mapper = mapper; }
         @Override
-        public PGobject convert(JsonNode source) {
+        public JdbcValue convert(JsonNode source) {
             if (source == null) return null;
             try {
-                PGobject p = new PGobject();
-                p.setType("jsonb");
-                p.setValue(mapper.writeValueAsString(source));
-                return p;
+                return JdbcValue.of(mapper.writeValueAsString(source), JDBCType.OTHER);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -78,12 +62,33 @@ public class PersistenceConfig {
     }
 
     @ReadingConverter
-    static class JsonNodeReadingConverter implements Converter<PGobject, JsonNode> {
+    static class JsonNodeReadingConverter implements Converter<String, JsonNode> {
         private final ObjectMapper mapper;
         public JsonNodeReadingConverter(ObjectMapper mapper) { this.mapper = mapper; }
         @Override
-        public JsonNode convert(PGobject source) {
+        public JsonNode convert(String source) {
             if (source == null) return null;
+            try {
+                return mapper.readTree(source);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @ReadingConverter
+    static class PgObjectToJsonNodeReadingConverter implements Converter<PGobject, JsonNode> {
+        private final ObjectMapper mapper;
+
+        public PgObjectToJsonNodeReadingConverter(ObjectMapper mapper) {
+            this.mapper = mapper;
+        }
+
+        @Override
+        public JsonNode convert(PGobject source) {
+            if (source == null || source.getValue() == null) {
+                return null;
+            }
             try {
                 return mapper.readTree(source.getValue());
             } catch (Exception e) {

@@ -8,6 +8,6 @@ public class HomeController {
 
     @GetMapping("/")
     public String index() {
-        return "redirect:/designer";
+        return "redirect:/t/00000000-0000-0000-0000-000000000000/designer";
     }
 }

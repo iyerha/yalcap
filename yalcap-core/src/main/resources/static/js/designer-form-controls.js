@@ -12,6 +12,18 @@
             return widget === 'table';
         },
 
+        isUploadWidget(widget) {
+            return widget === 'upload';
+        },
+
+        isSectionWidget(widget) {
+            return widget === 'section';
+        },
+
+        isGroupWidget(widget) {
+            return widget === 'group';
+        },
+
         slugify(value) {
             return (value || '')
                 .toString()
@@ -156,15 +168,27 @@
                 normalized.placeholder = '';
                 normalized.options = [];
                 normalized.assetKey = (normalized.assetKey || '').trim();
-                normalized.assetVersion = Number(normalized.assetVersion) || 1;
-                if (normalized.assetVersion < 1) {
-                    normalized.assetVersion = 1;
+                normalized.assetVersion = Number(normalized.assetVersion) || 0;
+                if (normalized.assetVersion < 0) {
+                    normalized.assetVersion = 0;
                 }
                 normalized.assetHash = (normalized.assetHash || '').trim();
                 normalized.altText = (normalized.altText || '').trim();
                 normalized.objectFit = (normalized.objectFit || 'contain').trim() || 'contain';
                 normalized.imageWidth = Number(normalized.imageWidth) || 0;
                 normalized.imageHeight = Number(normalized.imageHeight) || 0;
+            }
+
+            if (normalized.widget === 'upload') {
+                normalized.type = normalized.uploadAllowMultiple === true ? 'array' : 'string';
+                normalized.placeholder = '';
+                normalized.options = [];
+                normalized.uploadAccept = (normalized.uploadAccept || '').trim();
+                normalized.uploadAllowMultiple = normalized.uploadAllowMultiple === true;
+                normalized.uploadMaxBytes = Number(normalized.uploadMaxBytes) || 0;
+                if (normalized.uploadMaxBytes < 0) {
+                    normalized.uploadMaxBytes = 0;
+                }
             }
 
             if (normalized.widget === 'table') {
@@ -198,6 +222,26 @@
                 normalized.tableAllowReorder = normalized.tableAllowReorder === true;
             }
 
+            if (normalized.widget === 'section') {
+                normalized.type = 'object';
+                normalized.required = false;
+                normalized.placeholder = '';
+                normalized.options = [];
+                normalized.children = Array.isArray(normalized.children) ? normalized.children : [];
+                normalized.sectionDescription = (normalized.sectionDescription || '').trim();
+                normalized.sectionCollapsible = normalized.sectionCollapsible === true;
+                normalized.sectionDefaultExpanded = normalized.sectionDefaultExpanded !== false;
+            }
+
+            if (normalized.widget === 'group') {
+                normalized.type = 'object';
+                normalized.required = false;
+                normalized.placeholder = '';
+                normalized.options = [];
+                normalized.children = Array.isArray(normalized.children) ? normalized.children : [];
+                normalized.groupDescription = (normalized.groupDescription || '').trim();
+            }
+
             normalized.options = normalized.options.map((opt) => ({
                 label: (opt.label || '').trim(),
                 value: (opt.value || '').trim(),
@@ -214,7 +258,7 @@
             }
 
             if (!control.name || !control.name.trim()) {
-                if (!this.isImageWidget(control.widget)) {
+                if (!this.isImageWidget(control.widget) && !this.isSectionWidget(control.widget)) {
                     errs.push('Name is required.');
                 }
             }
@@ -281,12 +325,22 @@
                 if (!normalized.assetKey) {
                     errs.push('Image control requires asset key.');
                 }
-                if (!Number.isInteger(normalized.assetVersion) || normalized.assetVersion < 1) {
-                    errs.push('Image control requires pinned asset version >= 1.');
+                if (normalized.assetVersion > 0 && !Number.isInteger(normalized.assetVersion)) {
+                    errs.push('Image control asset version must be an integer when provided.');
                 }
-                if (!normalized.assetHash) {
-                    errs.push('Image control requires asset SHA-256 hash.');
+            }
+
+            if (normalized.widget === 'upload') {
+                if (!normalized.name || !normalized.name.trim()) {
+                    errs.push('Upload control requires a field name.');
                 }
+                if (normalized.uploadMaxBytes < 0) {
+                    errs.push('Upload max bytes must be 0 or greater.');
+                }
+            }
+
+            if (normalized.widget === 'group' && (!normalized.name || !normalized.name.trim())) {
+                errs.push('Group control requires a field name for object data binding.');
             }
 
             return errs;

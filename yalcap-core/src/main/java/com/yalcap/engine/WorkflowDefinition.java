@@ -2,18 +2,18 @@ package com.yalcap.engine;
 
 import java.util.UUID;
 
-public final class WorkflowManifest {
+public final class WorkflowDefinition {
 
     private final UUID id;
     private final String title;
     private final String version;
-    private final String rawManifest;
+    private final String rawDefinition;
 
-    public WorkflowManifest(UUID id, String title, String version, String rawManifest) {
+    public WorkflowDefinition(UUID id, String title, String version, String rawDefinition) {
         this.id = id;
         this.title = title;
         this.version = version;
-        this.rawManifest = rawManifest;
+        this.rawDefinition = rawDefinition;
     }
 
     public UUID getId() {
@@ -28,7 +28,8 @@ public final class WorkflowManifest {
         return version;
     }
 
-    public String getRawManifest() {
-        return rawManifest;
+    public String getRawDefinition() {
+        return rawDefinition;
     }
+
 }

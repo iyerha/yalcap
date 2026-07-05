@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("workflow_instance_documents")
-public class DocumentEntity {
+public class DocumentEntity implements TenantAware {
 
     @Id
     private UUID id;

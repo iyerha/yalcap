@@ -1,0 +1,131 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0002-create-workflow-definition-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: workflow_definition
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: definition_key
+                  type: varchar(200)
+              - column:
+                  name: version_number
+                  type: integer
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+              - column:
+                  name: definition
+                  type: jsonb
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+              - column:
+                  name: change_message
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by
+                  type: varchar(100)
+              - column:
+                  name: updated_by
+                  type: varchar(100)
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_workflow_definition_key_version ON workflow_definition (definition_key, version_number);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_workflow_definition_key_active ON workflow_definition (definition_key, active);
+        - sql:
+            sql: ALTER TABLE workflow_definition ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY workflow_definition_tenant_isolation ON workflow_definition
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0003-create-gin-index
+      author: yalcap
+      changes:
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_workflow_definition_definition_gin ON workflow_definition USING gin (definition);
+
+  - changeSet:
+      id: 0003-create-form-definition-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: form_definition
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: form_key
+                  type: varchar(200)
+              - column:
+                  name: version_number
+                  type: integer
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+              - column:
+                  name: definition
+                  type: jsonb
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+              - column:
+                  name: change_message
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by
+                  type: varchar(100)
+              - column:
+                  name: updated_by
+                  type: varchar(100)
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_form_definition_key_version ON form_definition (form_key, version_number);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_form_definition_key_active ON form_definition (form_key, active);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_form_definition_definition_gin ON form_definition USING gin (definition);
+        - sql:
+            sql: ALTER TABLE form_definition ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY form_definition_tenant_isolation ON form_definition
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);

@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("workflow_events")
-public class EventEntity {
+public class EventEntity implements TenantAware {
 
     @Id
     private UUID id;
