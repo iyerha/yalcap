@@ -1,0 +1,443 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0001-create-extension
+      author: yalcap
+      changes:
+        - sql:
+            sql: CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+  - changeSet:
+      id: 0002-create-workflow-manifest-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: workflow_manifest
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: manifest_key
+                  type: varchar(200)
+              - column:
+                  name: version_number
+                  type: integer
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+              - column:
+                  name: manifest
+                  type: jsonb
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+              - column:
+                  name: change_message
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by
+                  type: varchar(100)
+              - column:
+                  name: updated_by
+                  type: varchar(100)
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_workflow_manifest_key_version ON workflow_manifest (manifest_key, version_number);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_workflow_manifest_key_active ON workflow_manifest (manifest_key, active);
+        - sql:
+            sql: ALTER TABLE workflow_manifest ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY workflow_manifest_tenant_isolation ON workflow_manifest
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0004-create-workflow-instance-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: workflow_instance
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: manifest_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: data
+                  type: jsonb
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_step
+                  type: integer
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(50)
+                  defaultValue: OPEN
+              - column:
+                  name: assignee
+                  type: varchar(100)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: workflow_instance
+            baseColumnNames: manifest_id
+            referencedTableName: workflow_manifest
+            referencedColumnNames: id
+            constraintName: fk_workflow_instance_manifest
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_workflow_instance_data_gin ON workflow_instance USING gin (data);
+
+  - changeSet:
+      id: 0005-create-workflow-instance-assignments-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: workflow_instance_assignments
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: instance_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: step_id
+                  type: varchar(100)
+              - column:
+                  name: assignee_type
+                  type: varchar(20)
+              - column:
+                  name: assignee_id
+                  type: varchar(200)
+              - column:
+                  name: assigned_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: completed_at
+                  type: timestamp with time zone
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+        - addForeignKeyConstraint:
+            baseTableName: workflow_instance_assignments
+            baseColumnNames: instance_id
+            referencedTableName: workflow_instance
+            referencedColumnNames: id
+            constraintName: fk_wia_instance
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_wia_assignee_id ON workflow_instance_assignments (assignee_id);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_wia_instance_id ON workflow_instance_assignments (instance_id);
+
+  - changeSet:
+      id: 0006-create-workflow-events-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: workflow_events
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: instance_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: step_id
+                  type: varchar(100)
+              - column:
+                  name: event_type
+                  type: varchar(50)
+              - column:
+                  name: actor_id
+                  type: varchar(200)
+              - column:
+                  name: actor_type
+                  type: varchar(20)
+              - column:
+                  name: payload
+                  type: jsonb
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: workflow_events
+            baseColumnNames: instance_id
+            referencedTableName: workflow_instance
+            referencedColumnNames: id
+            constraintName: fk_we_instance
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_we_instance_id ON workflow_events (instance_id);
+
+  - changeSet:
+      id: 0007-create-workflow-instance-documents-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: workflow_instance_documents
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: instance_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: step_id
+                  type: varchar(100)
+              - column:
+                  name: document_id
+                  type: uuid
+              - column:
+                  name: storage_ref
+                  type: varchar(512)
+              - column:
+                  name: document_type
+                  type: varchar(100)
+              - column:
+                  name: mime_type
+                  type: varchar(100)
+              - column:
+                  name: uploaded_by
+                  type: varchar(100)
+              - column:
+                  name: uploaded_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: metadata
+                  type: jsonb
+        - addForeignKeyConstraint:
+            baseTableName: workflow_instance_documents
+            baseColumnNames: instance_id
+            referencedTableName: workflow_instance
+            referencedColumnNames: id
+            constraintName: fk_wid_instance
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_wid_instance_id ON workflow_instance_documents (instance_id);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_wid_step_id ON workflow_instance_documents (step_id);
+  - changeSet:
+      id: 0003-create-gin-index
+      author: yalcap
+      changes:
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_workflow_manifest_manifest_gin ON workflow_manifest USING gin (manifest);
+
+  - changeSet:
+      id: 0003-create-form-artifact-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: form_artifact
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: form_key
+                  type: varchar(200)
+              - column:
+                  name: version_number
+                  type: integer
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+              - column:
+                  name: artifact
+                  type: jsonb
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+              - column:
+                  name: change_message
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: created_by
+                  type: varchar(100)
+              - column:
+                  name: updated_by
+                  type: varchar(100)
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_form_artifact_key_version ON form_artifact (form_key, version_number);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_form_artifact_key_active ON form_artifact (form_key, active);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_form_artifact_artifact_gin ON form_artifact USING gin (artifact);
+        - sql:
+            sql: ALTER TABLE form_artifact ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY form_artifact_tenant_isolation ON form_artifact
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+  - changeSet:
+      id: 0008-add-tenant-to-workflow-instance
+      author: yalcap
+      changes:
+        - addColumn:
+            tableName: workflow_instance
+            columns:
+              - column:
+                  name: tenant_id
+                  type: uuid
+        - sql:
+            sql: UPDATE workflow_instance SET tenant_id = '00000000-0000-0000-0000-000000000000' WHERE tenant_id IS NULL;
+        - addNotNullConstraint:
+            tableName: workflow_instance
+            columnName: tenant_id
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_workflow_instance_tenant ON workflow_instance (tenant_id);
+        - sql:
+            sql: ALTER TABLE workflow_instance ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY workflow_instance_tenant_isolation ON workflow_instance
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0009-add-tenant-to-assignments
+      author: yalcap
+      changes:
+        - addColumn:
+            tableName: workflow_instance_assignments
+            columns:
+              - column:
+                  name: tenant_id
+                  type: uuid
+        - sql:
+            sql: UPDATE workflow_instance_assignments SET tenant_id = '00000000-0000-0000-0000-000000000000' WHERE tenant_id IS NULL;
+        - addNotNullConstraint:
+            tableName: workflow_instance_assignments
+            columnName: tenant_id
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_wia_tenant_id ON workflow_instance_assignments (tenant_id);
+        - sql:
+            sql: ALTER TABLE workflow_instance_assignments ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY wia_tenant_isolation ON workflow_instance_assignments
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0010-add-tenant-to-events
+      author: yalcap
+      changes:
+        - addColumn:
+            tableName: workflow_events
+            columns:
+              - column:
+                  name: tenant_id
+                  type: uuid
+        - sql:
+            sql: UPDATE workflow_events SET tenant_id = '00000000-0000-0000-0000-000000000000' WHERE tenant_id IS NULL;
+        - addNotNullConstraint:
+            tableName: workflow_events
+            columnName: tenant_id
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_we_tenant_id ON workflow_events (tenant_id);
+        - sql:
+            sql: ALTER TABLE workflow_events ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY we_tenant_isolation ON workflow_events
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0011-add-tenant-to-documents
+      author: yalcap
+      changes:
+        - addColumn:
+            tableName: workflow_instance_documents
+            columns:
+              - column:
+                  name: tenant_id
+                  type: uuid
+        - sql:
+            sql: UPDATE workflow_instance_documents SET tenant_id = '00000000-0000-0000-0000-000000000000' WHERE tenant_id IS NULL;
+        - addNotNullConstraint:
+            tableName: workflow_instance_documents
+            columnName: tenant_id
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_wid_tenant_id ON workflow_instance_documents (tenant_id);
+        - sql:
+            sql: ALTER TABLE workflow_instance_documents ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY wid_tenant_isolation ON workflow_instance_documents
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+

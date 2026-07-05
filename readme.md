@@ -1,1 +1,1 @@
-# Yalcap (yet another low code automation platform)
+# YALCAP! (yet another low code automation platform)

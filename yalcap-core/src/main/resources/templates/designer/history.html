@@ -1,0 +1,30 @@
+<div id="history" class="history">
+    <h2>Manifest history for <span th:text="${manifestKey}">manifestKey</span></h2>
+
+    <div th:if="${#lists.isEmpty(history)}">
+        <p>No history available for this manifest key.</p>
+    </div>
+
+    <div th:if="${!#lists.isEmpty(history)}">
+        <table>
+            <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>Active</th>
+                    <th>Created At</th>
+                    <th>Created By</th>
+                    <th>Change Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="entry : ${history}">
+                    <td th:text="${entry.versionNumber}">1</td>
+                    <td th:text="${entry.active}">true</td>
+                    <td th:text="${entry.createdAt}">timestamp</td>
+                    <td th:text="${entry.createdBy}">creator</td>
+                    <td th:text="${entry.changeMessage}">message</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

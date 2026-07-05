@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Form Designer</title>
+            <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+                crossorigin="anonymous"></script>
+    <script defer th:src="@{/js/designer-form-controls.js}" src="/js/designer-form-controls.js"></script>
+    <script defer th:src="@{/js/designer-form-schema.js}" src="/js/designer-form-schema.js"></script>
+    <script defer th:src="@{/js/designer-form.js}" src="/js/designer-form.js"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+    <link rel="stylesheet" th:href="@{/css/designer-form.css}" href="/css/designer-form.css" />
+</head>
+<body>
+    <div x-data="formDesigner()" x-init="applyTheme()" :data-theme="selectedTheme">
+        <h1>Form Designer</h1>
+        <p>Design a reusable form artifact (data schema + control layout) that can be embedded or referenced by workflow manifests.</p>
+
+        <section class="card">
+            <label>Manifest key</label>
+            <input id="manifestKey" x-model="manifestKey" th:value="${manifestKey}" />
+        </section>
+
+        <section class="card">
+            <h3>Style Profile</h3>
+            <div>
+                <label for="themePreset">Theme preset</label>
+                <select id="themePreset" x-model="selectedTheme" @change="applyTheme()">
+                    <option value="default">Default</option>
+                    <option value="slate">Slate</option>
+                    <option value="sunrise">Sunrise</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div x-show="selectedTheme === 'custom'">
+                <label for="accentColor">Accent color</label>
+                <input id="accentColor" type="color" x-model="customTheme.accent" @input="applyTheme()" />
+                <label for="bgColor">Background color</label>
+                <input id="bgColor" type="color" x-model="customTheme.bg" @input="applyTheme()" />
+                <label for="surfaceColor">Surface color</label>
+                <input id="surfaceColor" type="color" x-model="customTheme.surface" @input="applyTheme()" />
+                <label for="textColor">Text color</label>
+                <input id="textColor" type="color" x-model="customTheme.text" @input="applyTheme()" />
+            </div>
+        </section>
+
+        <section class="card">
+            <h3>Form Builder</h3>
+            <div class="builder-shell">
+                <div>
+                    <h4>Control Palette</h4>
+                    <p class="subtle">Drag controls into the canvas.</p>
+                    <template x-for="(item, idx) in controlPalette" :key="item.widget">
+                        <div class="palette-item" draggable="true" @dragstart="startPaletteDrag(idx)">
+                            <strong x-text="item.label"></strong>
+                            <div class="subtle" x-text="item.widget"></div>
+                        </div>
+                    </template>
+                </div>
+
+                <div>
+                    <h4>Canvas</h4>
+                    <p class="subtle">12-column grid canvas. Each control can span 1 to 12 columns.</p>
+                    <div class="canvas" @dragover.prevent @drop.prevent="dropOnCanvas()">
+                        <template x-if="controls.length === 0">
+                            <div class="subtle">Drop controls here to build the form.</div>
+                        </template>
+                        <template x-for="control in controls" :key="control.id">
+                            <div class="canvas-item"
+                                 :class="selectedControlId === control.id ? 'active' : ''"
+                                 :style="`grid-column: span ${control.colSpan || 12}`"
+                                 draggable="true"
+                                 @dragstart="startCanvasDrag(control.id)"
+                                 @dragover.prevent
+                                 @drop.prevent="dropOnControl(control.id)"
+                                 @click="selectControl(control.id)">
+                                <div><strong x-text="control.label || control.name"></strong></div>
+                                <div class="subtle">
+                                    <span x-text="control.widget"></span>
+                                    <span> | </span>
+                                    <span x-text="control.type"></span>
+                                    <span> | </span>
+                                    <span x-text="`span ${control.colSpan || 12}/12`"></span>
+                                </div>
+                                <button type="button" @click.stop="removeControl(control.id)">Remove</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <h4>Properties</h4>
+                    <template x-if="!selectedControl">
+                        <p class="subtle">Select a control from canvas to edit its properties.</p>
+                    </template>
+                    <template x-if="validationErrors.length > 0">
+                        <div class="subtle" style="color: #b91c1c; margin-bottom: 8px;">
+                            <strong>Validation issues:</strong>
+                            <ul>
+                                <template x-for="(err, idx) in validationErrors" :key="idx">
+                                    <li x-text="err"></li>
+                                </template>
+                            </ul>
+                        </div>
+                    </template>
+                    <template x-if="selectedControl">
+                        <div>
+                            <label>Label</label>
+                            <input x-model="selectedControl.label" @input="onLabelChanged()" />
+                            <label>Name</label>
+                            <input x-model="selectedControl.name" @input="onNameChanged()" />
+                            <p class="subtle">Name is auto-generated from label unless you edit it manually. Allowed: letters, digits, _ and $, and it cannot start with a digit.</p>
+                            <label>Type</label>
+                            <select x-model="selectedControl.type" @change="onTypeChanged()">
+                                <option value="string">string</option>
+                                <option value="number">number</option>
+                                <option value="boolean">boolean</option>
+                                <option value="array">array</option>
+                            </select>
+                            <label>Widget</label>
+                            <select x-model="selectedControl.widget" @change="onWidgetChanged()">
+                                <option value="text">text</option>
+                                <option value="number">number</option>
+                                <option value="textarea">textarea</option>
+                                <option value="select">select</option>
+                                <option value="radio">radio</option>
+                                <option value="checkbox">checkbox</option>
+                                <option value="booleanCheckbox">booleanCheckbox</option>
+                                <option value="image">image</option>
+                                <option value="table">table</option>
+                            </select>
+                            <label>Required</label>
+                            <input type="checkbox" x-model="selectedControl.required" @change="syncSelected()" />
+                            <label>Placeholder</label>
+                            <input x-model="selectedControl.placeholder" @input="syncSelected()" />
+                            <label>Column span (1-12)</label>
+                            <select x-model.number="selectedControl.colSpan" @change="syncSelected()">
+                                <template x-for="col in columnOptions" :key="col">
+                                    <option :value="col" x-text="col"></option>
+                                </template>
+                            </select>
+
+                            <template x-if="isOptionWidget(selectedControl.widget)">
+                                <div>
+                                    <label>Options (label and value)</label>
+                                    <div class="option-editor">
+                                        <template x-for="(opt, idx) in selectedControl.options" :key="idx">
+                                            <div class="option-row">
+                                                <input
+                                                    x-model="opt.label"
+                                                    @input="onOptionLabelChanged(idx)"
+                                                    placeholder="Label" />
+                                                <input
+                                                    x-model="opt.value"
+                                                    @input="onOptionValueChanged(idx)"
+                                                    placeholder="Value" />
+                                                <button type="button" @click.prevent="removeOptionRow(idx)">Remove</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <button type="button" @click.prevent="addOptionRow()">Add option</button>
+                                </div>
+                            </template>
+
+                            <template x-if="selectedControl.widget === 'image'">
+                                <div>
+                                    <label>Asset key</label>
+                                    <input x-model="selectedControl.assetKey" @input="syncSelected()" placeholder="hero-banner" />
+                                    <label>Asset version (pinned)</label>
+                                    <input type="number" min="1" x-model.number="selectedControl.assetVersion" @input="syncSelected()" />
+                                    <label>Asset SHA-256</label>
+                                    <input x-model="selectedControl.assetHash" @input="syncSelected()" placeholder="hex hash" />
+                                    <label>Alt text</label>
+                                    <input x-model="selectedControl.altText" @input="syncSelected()" placeholder="Descriptive alt text" />
+                                    <label>Object fit</label>
+                                    <select x-model="selectedControl.objectFit" @change="syncSelected()">
+                                        <option value="contain">contain</option>
+                                        <option value="cover">cover</option>
+                                        <option value="fill">fill</option>
+                                        <option value="none">none</option>
+                                    </select>
+                                    <label>Width (optional px)</label>
+                                    <input type="number" min="0" x-model.number="selectedControl.imageWidth" @input="syncSelected()" />
+                                    <label>Height (optional px)</label>
+                                    <input type="number" min="0" x-model.number="selectedControl.imageHeight" @input="syncSelected()" />
+                                </div>
+                            </template>
+
+                            <template x-if="selectedControl.widget === 'table'">
+                                <div>
+                                    <label>Minimum rows</label>
+                                    <input type="number" min="0" x-model.number="selectedControl.tableMinItems" @input="syncSelected()" />
+                                    <label>Maximum rows (0 = no limit)</label>
+                                    <input type="number" min="0" x-model.number="selectedControl.tableMaxItems" @input="syncSelected()" />
+                                    <label>Allow add rows</label>
+                                    <input type="checkbox" x-model="selectedControl.tableAllowAdd" @change="syncSelected()" />
+                                    <label>Allow delete rows</label>
+                                    <input type="checkbox" x-model="selectedControl.tableAllowDelete" @change="syncSelected()" />
+                                    <label>Allow reorder rows</label>
+                                    <input type="checkbox" x-model="selectedControl.tableAllowReorder" @change="syncSelected()" />
+
+                                    <label>Columns</label>
+                                    <div class="option-editor">
+                                        <template x-for="(col, idx) in selectedControl.tableColumns" :key="idx">
+                                            <div class="option-row" style="grid-template-columns: 1fr 1fr 120px auto auto;">
+                                                <input
+                                                    x-model="col.key"
+                                                    @input="onTableColumnKeyChanged(idx)"
+                                                    placeholder="Key" />
+                                                <input
+                                                    x-model="col.title"
+                                                    @input="syncSelected()"
+                                                    placeholder="Title" />
+                                                <select x-model="col.type" @change="syncSelected()">
+                                                    <option value="string">string</option>
+                                                    <option value="number">number</option>
+                                                    <option value="boolean">boolean</option>
+                                                </select>
+                                                <label style="display:flex; align-items:center; gap:6px;">
+                                                    <input type="checkbox" x-model="col.required" @change="syncSelected()" />
+                                                    Req
+                                                </label>
+                                                <button type="button" @click.prevent="removeTableColumn(idx)">Remove</button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <button type="button" @click.prevent="addTableColumn()">Add column</button>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h3>Generated Artifact JSON</h3>
+            <button @click.prevent="generate">Generate Form Artifact</button>
+            <form id="publish-form" method="post" action="/designer/publish">
+                <input type="hidden" name="manifestKey" id="publish-manifestKey" x-model="manifestKey" />
+                <div>
+                    <label for="manifest-json">Artifact JSON</label>
+                    <textarea id="manifest-json" name="manifest" rows="12" style="width:100%" x-model="manifestJson" th:text="${activeManifest != null ? (activeManifest.manifest != null ? activeManifest.manifest : activeManifest.artifact) : ''}"></textarea>
+                </div>
+                <div>
+                    <label for="createdBy">Created by</label>
+                    <input id="createdBy" name="createdBy" value="designer" />
+                </div>
+                <div>
+                    <label for="changeMessage">Change message</label>
+                    <input id="changeMessage" name="changeMessage" value="Created via form designer" style="width:100%" />
+                </div>
+                <button type="submit">Publish artifact</button>
+            </form>
+        </section>
+    </div>
+
+</body>
+</html>

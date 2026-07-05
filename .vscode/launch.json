@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-Application<yalcap-core>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.yalcap.Application",
+            "projectName": "yalcap-core",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

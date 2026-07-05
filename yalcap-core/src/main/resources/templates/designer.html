@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Yalcap Manifest Designer</title>
+            <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+                integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V"
+                crossorigin="anonymous"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 32px; }
+        textarea { width: 100%; min-height: 220px; font-family: monospace; }
+        section { margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        pre { background: #f4f4f4; padding: 12px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Yalcap Manifest Designer</h1>
+
+    <section>
+        <label for="manifest-key">Manifest key</label>
+        <input id="manifest-key" name="manifestKey" th:value="${manifestKey}" style="width: 320px; margin-left: 12px;" />
+        <button hx-get="/designer/active" hx-trigger="click" hx-target="#active-manifest" hx-swap="outerHTML" hx-include="#manifest-key">Load active</button>
+        <button hx-get="/designer/history" hx-trigger="click" hx-target="#history" hx-swap="outerHTML" hx-include="#manifest-key">Load history</button>
+    </section>
+
+    <section id="active-manifest" hx-get="/designer/active" hx-trigger="load" hx-target="#active-manifest" hx-swap="outerHTML" hx-include="#manifest-key">
+        <div>Loading active manifest…</div>
+    </section>
+
+    <section id="history" hx-get="/designer/history" hx-trigger="load" hx-target="#history" hx-swap="outerHTML" hx-include="#manifest-key">
+        <div>Loading manifest history…</div>
+    </section>
+
+    <section>
+        <h2>Publish new manifest</h2>
+        <form id="publish-form" hx-post="/designer/publish" hx-target="#active-manifest" hx-swap="outerHTML" hx-include="#manifest-key">
+            <input type="hidden" name="manifestKey" th:value="${manifestKey}" id="publish-manifest-key" />
+            <div>
+                <label for="manifest-body">Manifest JSON</label>
+                <textarea id="manifest-body" name="manifest" placeholder='{"steps": [...]}'></textarea>
+            </div>
+            <div>
+                <label for="created-by">Created by</label>
+                <input id="created-by" name="createdBy" value="designer" />
+            </div>
+            <div>
+                <label for="change-message">Change message</label>
+                <input id="change-message" name="changeMessage" value="Initial manifest publish" style="width: 100%;" />
+            </div>
+            <button type="submit">Publish manifest</button>
+        </form>
+    </section>
+</body>
+</html>
