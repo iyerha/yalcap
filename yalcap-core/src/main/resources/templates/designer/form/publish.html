@@ -1,0 +1,22 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="page">
+    <section class="card" x-show="activePage === 'publish'" x-cloak>
+        <h3>Generated Definition JSON</h3>
+        <button @click.prevent="generate">Generate Form Definition</button>
+        <form id="publish-form" method="post" th:action="${tenantId != null} ? @{/t/{tenantId}/designer/publish(tenantId=${tenantId})} : @{/designer/publish}" action="/designer/publish">
+            <input type="hidden" name="definitionKey" id="publish-definitionKey" x-model="definitionKey" />
+            <div>
+                <label for="definition-json">Definition JSON</label>
+                <textarea id="definition-json" name="definition" rows="12" style="width:100%" x-model="definitionJson" th:text="${activeDefinition != null ? activeDefinition.definition : ''}"></textarea>
+            </div>
+            <div>
+                <label for="createdBy">Created by</label>
+                <input id="createdBy" name="createdBy" value="designer" />
+            </div>
+            <div>
+                <label for="changeMessage">Change message</label>
+                <input id="changeMessage" name="changeMessage" value="Created via form designer" style="width:100%" />
+            </div>
+            <button type="submit">Publish definition</button>
+        </form>
+    </section>
+</th:block>

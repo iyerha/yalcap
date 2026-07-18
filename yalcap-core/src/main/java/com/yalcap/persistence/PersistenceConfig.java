@@ -76,7 +76,6 @@ public class PersistenceConfig {
         }
     }
 
-    @ReadingConverter
     static class PgObjectToJsonNodeReadingConverter implements Converter<PGobject, JsonNode> {
         private final ObjectMapper mapper;
 

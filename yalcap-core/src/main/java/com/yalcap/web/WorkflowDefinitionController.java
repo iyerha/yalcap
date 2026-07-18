@@ -39,6 +39,19 @@ public class WorkflowDefinitionController {
         return ResponseEntity.ok(definitionService.getDefinitionHistory(definitionKey));
     }
 
+    @PostMapping("/{definitionKey}/resolved")
+    @ResponseBody
+    public ResponseEntity<?> resolveDefinitionView(@PathVariable String definitionKey,
+                                                   @RequestBody(required = false) WorkflowDefinitionService.ResolveDefinitionViewRequest request) {
+        try {
+            return definitionService.resolveDefinitionView(definitionKey, request)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
     @PostMapping("/{definitionKey}/publish")
     @ResponseBody
     public ResponseEntity<?> publishDefinition(@PathVariable String definitionKey,

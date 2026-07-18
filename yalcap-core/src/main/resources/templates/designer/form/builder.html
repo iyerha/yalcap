@@ -1,0 +1,10 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="page">
+    <section class="card" x-show="activePage === 'builder'" x-cloak>
+        <h3>Form Builder</h3>
+        <div class="builder-shell" :class="{ 'palette-collapsed': paletteCollapsed, 'properties-collapsed': propertiesCollapsed }">
+            <th:block th:replace="~{designer/form/builder-palette :: panel}"></th:block>
+            <th:block th:replace="~{designer/form/builder-canvas :: panel}"></th:block>
+            <th:block th:replace="~{designer/form/builder-properties :: panel}"></th:block>
+        </div>
+    </section>
+</th:block>

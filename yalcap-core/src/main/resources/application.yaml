@@ -3,8 +3,8 @@ spring:
     name: yalcap-core
   datasource:
     url: jdbc:postgresql://localhost:5432/yalcap
-    username: postgres
-    password: root
+    username: yalcap_admin
+    password: secure_password_123
     driver-class-name: org.postgresql.Driver
   liquibase:
     enabled: true

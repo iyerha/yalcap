@@ -1,0 +1,84 @@
+services:
+
+  # Bedrock Transactional Database Layer (Postgres)
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: yalcap-postgres
+    environment:
+      POSTGRES_DB: yalcap
+      POSTGRES_USER: yalcap_admin
+      POSTGRES_PASSWORD: secure_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+    networks:
+      - yalcap-network
+
+    # Tweak processing constraints for lower-end CPU cores
+
+    command: ["postgres", "-c", "max_connections=20", "-c", "shared_buffers=128MB"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yalcap_admin -d yalcap"]
+      interval: 10s # Relaxed check intervals to reduce background CPU wakeups
+      timeout: 5s
+      retries: 3
+
+  # Discovery, Analytics & Full-Text Search Layer (SolrCloud)
+
+  solr:
+    image: solr:10.0
+    container_name: yalcap-solr
+    ports:
+      - "8983:8983"
+
+    environment:
+      # Heavily restricted heap size to prevent RAM bloat on your 12GB system
+      - SOLR_JAVA_MEM=-Xms128m -Xmx256m 
+
+    volumes:
+      - solr_data:/var/solr
+
+    networks:
+      - yalcap-network
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
+
+  # Dedicated Headless Browser Service for HTML-to-PDF Printing (Browserless Chrome)
+
+  browser-node:
+    image: browserless/chrome:latest
+    container_name: yalcap-browser
+    ports:
+      - "3000:3000"
+
+    environment:
+      # CRUCIAL: Limit parallel browser tabs to prevent spikes on your Pentium CPU
+      - MAX_CONCURRENT_SESSIONS=2 
+      - CONNECTION_TIMEOUT=30000
+      # Optimize Chrome memory footprints inside the container
+      - EXIT_ON_HEALTH_FAILURE=true
+      - PREBOOT_CHROME=false
+
+    networks:
+      - yalcap-network
+
+    restart: always
+
+
+
+networks:
+  yalcap-network:
+    driver: bridge
+
+
+
+volumes:
+  postgres_data:
+  solr_data:

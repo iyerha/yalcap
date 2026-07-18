@@ -1,0 +1,257 @@
+.rules-list {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.rule-card {
+    border: 0;
+    border-radius: 0;
+    padding: 4px 0 10px;
+    background: transparent;
+}
+
+.rule-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.rule-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.move-inline-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: color-mix(in oklab, var(--surface) 90%, var(--bg));
+    color: var(--text);
+}
+
+.move-inline-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.rule-grid,
+.rule-condition-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+    align-items: start;
+}
+
+.rule-field {
+    min-width: 0;
+}
+
+.rule-field-wide {
+    grid-column: 1 / -1;
+}
+
+.rule-target-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 180px;
+    gap: 8px;
+    align-items: center;
+}
+
+.rule-target-picker {
+    margin: 2px 0 6px;
+}
+
+.rule-conditions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.rule-conditions-list {
+    display: grid;
+    gap: 4px;
+}
+
+.rule-condition-table {
+    display: grid;
+    gap: 4px;
+}
+
+.rule-condition-table-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) 170px minmax(0, 1fr) 32px;
+    gap: 10px;
+    align-items: center;
+    padding: 0 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+}
+
+.rule-match-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    flex-wrap: wrap;
+}
+
+.rule-condition-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) 170px minmax(0, 1fr) 32px;
+    gap: 6px;
+    align-items: start;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.rule-condition-field,
+.rule-condition-op-field,
+.rule-condition-value-field {
+    min-width: 0;
+}
+
+.rule-condition-field .subtle,
+.rule-condition-value-field .subtle {
+    margin-top: 2px;
+}
+
+.rule-condition-field .subtle,
+.rule-condition-value-field .subtle,
+.rule-condition-block .subtle {
+    display: none;
+}
+
+.rule-condition-op-field select,
+.rule-condition-value-field input,
+.rule-condition-field input,
+.rule-condition-field select {
+    margin-bottom: 0;
+}
+
+.rule-card .rule-field label {
+    margin-top: 0;
+}
+
+.rule-flag-field {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    margin-top: 20px;
+}
+
+.rule-flag-field input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.rule-condition-block {
+    display: block;
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.rule-actions-block {
+    display: block;
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 8px;
+    border-top: 1px dashed color-mix(in oklab, var(--border) 65%, transparent);
+    padding-top: 4px;
+}
+
+.rule-actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.rule-actions-list {
+    display: grid;
+    gap: 4px;
+}
+
+.rule-action-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 280px auto;
+    gap: 6px;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.rule-action-prefix {
+    font-weight: 600;
+    color: var(--muted);
+    margin-right: 0;
+}
+
+.rule-action-row > select,
+.rule-action-row > button {
+    margin: 0;
+}
+
+.rule-action-row > button {
+    flex: 0 0 auto;
+}
+
+.rule-action-value {
+    margin-top: 0;
+    display: block;
+}
+
+@media (max-width: 980px) {
+    .rule-grid,
+    .rule-condition-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .rule-flag-field {
+        margin-top: 0;
+    }
+
+    .rule-target-row {
+        grid-template-columns: 1fr;
+    }
+
+    .rule-action-row {
+        grid-template-columns: 1fr;
+    }
+
+    .rule-action-row > select,
+    .rule-action-row > button {
+        width: 100%;
+    }
+
+    .rule-condition-line {
+        grid-template-columns: 1fr;
+    }
+
+    .rule-condition-table-header {
+        display: none;
+    }
+
+    .rule-conditions-header {
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
+
+    .rule-match-mode-row {
+        width: 100%;
+    }
+}

@@ -1,0 +1,39 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="page">
+    <div x-show="activePage === 'overview'" x-cloak>
+        <section class="card">
+            <label>Definition key</label>
+            <input id="definitionKey" x-model="definitionKey" th:value="${definitionKey}" />
+        </section>
+
+        <section class="card">
+            <h3>Style Profile</h3>
+            <div>
+                <label for="themePreset">Theme preset</label>
+                <select id="themePreset" x-model="selectedTheme" @change="applyTheme()">
+                    <option value="default">Default</option>
+                    <option value="slate">Slate</option>
+                    <option value="sunrise">Sunrise</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div x-show="selectedTheme === 'custom'">
+                <label for="accentColor">Accent color</label>
+                <input id="accentColor" type="color" x-model="customTheme.accent" @input="applyTheme()" />
+                <label for="bgColor">Background color</label>
+                <input id="bgColor" type="color" x-model="customTheme.bg" @input="applyTheme()" />
+                <label for="surfaceColor">Surface color</label>
+                <input id="surfaceColor" type="color" x-model="customTheme.surface" @input="applyTheme()" />
+                <label for="textColor">Text color</label>
+                <input id="textColor" type="color" x-model="customTheme.text" @input="applyTheme()" />
+            </div>
+            <div>
+                <label for="validationPlacement">Validation message placement</label>
+                <select id="validationPlacement" x-model="validationDisplayMode">
+                    <option value="inline">Inline only</option>
+                    <option value="summary">Summary only</option>
+                    <option value="inline-summary">Inline + summary</option>
+                </select>
+            </div>
+        </section>
+    </div>
+</th:block>

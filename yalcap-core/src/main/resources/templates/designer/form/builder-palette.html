@@ -1,0 +1,26 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="panel">
+    <div class="builder-panel side-panel" :class="{ 'pane-collapsed': paletteCollapsed }">
+        <div class="pane-header">
+            <h4 x-show="!paletteCollapsed" x-cloak>Control Palette</h4>
+            <button type="button" class="pane-toggle-btn" @click="togglePaletteCollapsed()" :title="paletteCollapsed ? 'Expand control palette' : 'Collapse control palette'" :aria-label="paletteCollapsed ? 'Expand control palette' : 'Collapse control palette'">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" :class="paletteCollapsed ? 'chevron-right' : 'chevron-left'">
+                    <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+            </button>
+        </div>
+        <p class="subtle" x-show="!paletteCollapsed" x-cloak>Drag controls into the canvas.</p>
+        <div class="palette-list">
+            <template x-for="(item, idx) in controlPalette" :key="item.widget">
+                <div class="palette-item" :data-palette-index="idx" :title="paletteCollapsed ? `${item.label} (${item.widget})` : null" :aria-label="paletteCollapsed ? `${item.label} control` : null">
+                    <div class="palette-item-row">
+                        <span class="palette-icon" aria-hidden="true" x-html="paletteIconSvg(item.widget)"></span>
+                        <div x-show="!paletteCollapsed" x-cloak>
+                            <strong x-text="item.label"></strong>
+                            <div class="subtle" x-text="item.widget"></div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</th:block>

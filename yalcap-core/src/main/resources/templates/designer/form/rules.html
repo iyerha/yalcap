@@ -1,0 +1,165 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="page">
+    <section class="card" x-show="activePage === 'rules'" x-cloak>
+        <h3>Rules</h3>
+        <p class="subtle">Define runtime rule effects for state keys. These rules are included in generated definition JSON.</p>
+        <template x-if="rules.length === 0">
+            <p class="subtle">No rules yet. Add one to start defining visibility, readability, writability, required, or enabled behavior.</p>
+        </template>
+        <div class="rules-list">
+            <template x-for="(rule, idx) in rules" :key="idx">
+                <div class="rule-card">
+                    <div class="rule-card-header">
+                        <strong x-text="rule.id || ('rule-' + (idx + 1))"></strong>
+                        <div class="rule-header-actions">
+                            <button type="button" class="move-inline-btn" title="Move rule up" aria-label="Move rule up" @click.prevent="moveRuleUp(idx)" :disabled="idx === 0">&#8593;</button>
+                            <button type="button" class="move-inline-btn" title="Move rule down" aria-label="Move rule down" @click.prevent="moveRuleDown(idx)" :disabled="idx === rules.length - 1">&#8595;</button>
+                            <button type="button" class="remove-inline-btn" title="Remove rule" aria-label="Remove rule" @click.prevent="removeRule(idx)">
+                                <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">
+                                    <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="rule-grid">
+                        <div class="rule-field">
+                            <label>Rule id</label>
+                            <input x-model="rule.id" placeholder="r-hide-secret" />
+                        </div>
+                        <div class="rule-field">
+                            <label>Scope</label>
+                            <select x-model="rule.scope">
+                                <option value="form">form</option>
+                                <option value="step">step</option>
+                            </select>
+                        </div>
+                        <div class="rule-field rule-field-wide">
+                            <div class="rule-conditions-header">
+                                <strong>When</strong>
+                                <div class="rule-match-mode-row">
+                                    <span class="subtle">Match</span>
+                                    <select x-model="rule.conditionMatchMode" aria-label="Condition match mode">
+                                        <option value="all">all</option>
+                                        <option value="any">any</option>
+                                    </select>
+                                    <span class="subtle">conditions of the following</span>
+                                </div>
+                                <button type="button" class="move-inline-btn" @click.prevent="addRuleCondition(rule)">Add condition</button>
+                            </div>
+                            <div class="rule-condition-table-header">
+                                <span>Field</span>
+                                <span>Operator</span>
+                                <span>Value</span>
+                                <span></span>
+                            </div>
+                            <div class="rule-condition-table">
+                                <div class="rule-conditions-list">
+                                    <template x-for="(condition, conditionIdx) in rule.conditions" :key="conditionIdx">
+                                        <div class="rule-condition-line">
+                                        <div class="rule-condition-field">
+                                            <div class="rule-target-row">
+                                                <input x-model="condition.field" list="condition-field-options" placeholder="data.applicant.email" />
+                                                <select class="rule-target-picker" @change="if ($event.target.value) { condition.field = $event.target.value; $event.target.value = ''; }" title="Pick from available fields" aria-label="Pick from available fields">
+                                                    <option value="">Pick field...</option>
+                                                    <template x-for="item in availableConditionFieldOptions()" :key="item.key">
+                                                        <option :value="item.key" x-text="`${item.label} (${item.key})`"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                            <p class="subtle" x-show="conditionFieldError(condition)" x-text="conditionFieldError(condition)"></p>
+                                        </div>
+                                        <div class="rule-condition-op-field">
+                                            <select x-model="condition.op">
+                                                <option value="eq">equal to</option>
+                                                <option value="ne">not equal to</option>
+                                                <option value="in">one of</option>
+                                                <option value="notIn">not one of</option>
+                                                <option value="gt">greater than</option>
+                                                <option value="gte">greater than or equal to</option>
+                                                <option value="lt">less than</option>
+                                                <option value="lte">less than or equal to</option>
+                                                <option value="exists">has a value</option>
+                                                <option value="matches">matches pattern</option>
+                                            </select>
+                                        </div>
+                                        <div class="rule-condition-value-field">
+                                            <template x-if="condition.op === 'in' || condition.op === 'notIn'">
+                                                <input x-model="condition.valuesText" placeholder="finance, audit" />
+                                            </template>
+                                            <template x-if="condition.op !== 'in' && condition.op !== 'notIn' && condition.op !== 'exists'">
+                                                <input x-model="condition.value" placeholder="review" />
+                                            </template>
+                                            <template x-if="condition.op === 'exists'">
+                                                <input value="(not required)" disabled />
+                                            </template>
+                                            <p class="subtle" x-show="conditionValueError(condition)" x-text="conditionValueError(condition)"></p>
+                                        </div>
+                                        <button type="button" class="remove-inline-btn" title="Remove condition" aria-label="Remove condition" @click.prevent="removeRuleCondition(rule, conditionIdx)" :disabled="rule.conditions.length <= 1">
+                                            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">
+                                                <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                            </svg>
+                                        </button>
+                                        </div>
+                                    </template>
+                            </div>
+                        </div>
+                    </div>
+                    <details class="rule-condition-block">
+                        <summary>Advanced condition logic</summary>
+                        <label>JSON Logic</label>
+                        <textarea rows="3" x-model="rule.whenJsonLogic" placeholder='{"==":[{"var":"workflow.stepId"},"review"]}'></textarea>
+                    </details>
+                    <div class="rule-actions-block">
+                        <div class="rule-actions-header">
+                            <strong>Then apply actions</strong>
+                            <button type="button" class="move-inline-btn" @click.prevent="addRuleAction(rule)">Add action</button>
+                        </div>
+                        <div class="rule-actions-list">
+                            <template x-for="(action, actionIdx) in rule.actions" :key="actionIdx">
+                                <div class="rule-action-row">
+                                    <span class="rule-action-prefix">Set</span>
+                                    <div class="rule-target-row">
+                                        <input x-model="action.target" list="state-key-options" placeholder="applicant.email" />
+                                        <select class="rule-target-picker" @change="if ($event.target.value) { action.target = $event.target.value; $event.target.value = ''; }" title="Pick from available state keys" aria-label="Pick from available state keys">
+                                            <option value="">Pick key...</option>
+                                            <template x-for="item in availableStateKeyOptions()" :key="item.key">
+                                                <option :value="item.key" x-text="`${item.label} (${item.key})`"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <select x-model="action.intent" title="Action intent" aria-label="Action intent">
+                                        <option value="visible:true">to be visible</option>
+                                        <option value="visible:false">to be hidden</option>
+                                        <option value="readable:true">to be readable</option>
+                                        <option value="readable:false">to be unreadable</option>
+                                        <option value="writable:true">to be editable</option>
+                                        <option value="writable:false">to be read only</option>
+                                        <option value="enabled:true">to be enabled</option>
+                                        <option value="enabled:false">to be disabled</option>
+                                        <option value="required:true">to be required</option>
+                                        <option value="required:false">to be optional</option>
+                                    </select>
+                                    <button type="button" class="remove-inline-btn" title="Remove action" aria-label="Remove action" @click.prevent="removeRuleAction(rule, actionIdx)" :disabled="rule.actions.length <= 1">
+                                        <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">
+                                            <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <datalist id="state-key-options">
+            <template x-for="key in availableStateKeys()" :key="key">
+                <option :value="key"></option>
+            </template>
+        </datalist>
+        <datalist id="condition-field-options">
+            <template x-for="item in availableConditionFieldOptions()" :key="item.key">
+                <option :value="item.key"></option>
+            </template>
+        </datalist>
+        <button type="button" @click.prevent="addRule()">Add rule</button>
+    </section>
+</th:block>
