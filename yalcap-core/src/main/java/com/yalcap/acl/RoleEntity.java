@@ -8,8 +8,8 @@ import com.yalcap.persistence.TenantAware;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-@Table("role_definition")
-public class RoleDefinitionEntity implements TenantAware {
+@Table("acl_role")
+public class RoleEntity implements TenantAware {
 
     @Id
     private UUID id;

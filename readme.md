@@ -54,6 +54,30 @@ mvn -pl yalcap-core spring-boot:run
 mvn -pl yalcap-core test
 ```
 
+## Plugin API: Form Load Data
+
+YALCAP now includes a server-side plugin API for form-load data hydration.
+
+Purpose:
+
+- fetch data from internal or external systems at form load time
+- keep credentials and integration logic on the server
+- merge provider output into the rule evaluation context
+
+Core types:
+
+- [FormLoadDataProvider.java](yalcap-core/src/main/java/com/yalcap/definition/form/load/FormLoadDataProvider.java)
+- [FormLoadDataContext.java](yalcap-core/src/main/java/com/yalcap/definition/form/load/FormLoadDataContext.java)
+- [FormLoadDataHydrationService.java](yalcap-core/src/main/java/com/yalcap/definition/form/load/FormLoadDataHydrationService.java)
+
+To add a provider:
+
+1. Implement `FormLoadDataProvider`.
+2. Register it as a Spring bean.
+3. Return an `ObjectNode` containing fields to merge into form-load data.
+
+Providers are executed in order (`order()` then `id()`), and their output is merged before workflow rules are evaluated.
+
 ## Collaboration
 
 If you want to help build YALCAP as an open source project, start here:

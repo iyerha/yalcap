@@ -8,8 +8,8 @@ import com.yalcap.persistence.TenantAware;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-@Table("principal_group")
-public class PrincipalGroupEntity implements TenantAware {
+@Table("user_group")
+public class GroupEntity implements TenantAware {
 
     @Id
     private UUID id;

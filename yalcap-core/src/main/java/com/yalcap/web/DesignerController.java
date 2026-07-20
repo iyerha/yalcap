@@ -7,6 +7,7 @@ import com.yalcap.definition.workflow.WorkflowDefinitionService;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -115,6 +116,43 @@ public class DesignerController {
         model.addAttribute("tenantId", tenantId);
         formDefinitionService.getActiveForm(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
         return "designer/form";
+    }
+
+    @GetMapping("/workflow")
+    public String workflowDesigner(@PathVariable(value = "tenantId", required = false) UUID tenantId,
+                                   @RequestParam(required = false) String definitionKey,
+                                   Model model) throws Exception {
+        String key = definitionKey != null ? definitionKey : "example-review";
+        putDefinitionKey(model, key);
+        model.addAttribute("tenantId", tenantId);
+        model.addAttribute("workflowPublishAction", tenantId != null
+            ? "/t/" + tenantId + "/designer/workflow/publish"
+            : "/designer/workflow/publish");
+        seedExampleDefinition(key);
+        definitionService.getActiveDefinition(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
+        return "designer/workflow";
+    }
+
+    @PostMapping("/workflow/publish")
+    public String publishWorkflowDefinition(@PathVariable(value = "tenantId", required = false) UUID tenantId,
+                                            @ModelAttribute PublishDefinitionForm form,
+                                            RedirectAttributes redirectAttributes) throws Exception {
+        JsonNode definition = objectMapper.readTree(form.getDefinition());
+
+        try {
+            definitionService.publishDefinition(
+                    form.getDefinitionKey(),
+                    definition,
+                    form.getCreatedBy(),
+                    form.getChangeMessage()
+            );
+            redirectAttributes.addFlashAttribute("publishSuccess", true);
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("publishError", ex.getMessage());
+        }
+
+        String basePath = tenantId != null ? "/t/" + tenantId + "/designer/workflow" : "/designer/workflow";
+        return "redirect:" + basePath + "?definitionKey=" + form.getDefinitionKey();
     }
 
     private void seedExampleDefinition(String definitionKey) throws Exception {

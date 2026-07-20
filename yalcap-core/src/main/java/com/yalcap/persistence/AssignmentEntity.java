@@ -1,5 +1,6 @@
 package com.yalcap.persistence;
 
+import com.yalcap.engine.AssigneeType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
@@ -53,7 +54,9 @@ public class AssignmentEntity {
     public String getStepId() { return stepId; }
     public void setStepId(String stepId) { this.stepId = stepId; }
     public String getAssigneeType() { return assigneeType; }
+    public AssigneeType getAssigneeTypeValue() { return AssigneeType.valueOf(assigneeType); }
     public void setAssigneeType(String assigneeType) { this.assigneeType = assigneeType; }
+    public void setAssigneeType(AssigneeType assigneeType) { this.assigneeType = assigneeType.name(); }
     public String getAssigneeId() { return assigneeId; }
     public void setAssigneeId(String assigneeId) { this.assigneeId = assigneeId; }
     public boolean isActive() { return active; }

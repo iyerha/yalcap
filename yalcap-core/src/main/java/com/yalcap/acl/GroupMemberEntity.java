@@ -20,6 +20,9 @@ public class GroupMemberEntity implements TenantAware {
     @Column("group_id")
     private UUID groupId;
 
+    @Column("user_id")
+    private UUID userId;
+
     @Column("user_key")
     private String userKey;
 
@@ -48,6 +51,14 @@ public class GroupMemberEntity implements TenantAware {
 
     public void setGroupId(UUID groupId) {
         this.groupId = groupId;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public void setUserId(UUID userId) {
+        this.userId = userId;
     }
 
     public String getUserKey() {

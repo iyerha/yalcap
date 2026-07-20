@@ -1,6 +1,9 @@
 package com.yalcap.definition.workflow;
 
 import com.yalcap.asset.AssetFileRepository;
+import com.yalcap.definition.form.load.FormLoadDataContext;
+import com.yalcap.definition.form.load.FormLoadDataHydrationService;
+import com.yalcap.definition.form.load.FormLoadDataProvider;
 import com.yalcap.definition.form.FormDefinitionRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -23,11 +26,13 @@ class WorkflowDefinitionServiceTest {
     private final FormDefinitionRepository formRepository = Mockito.mock(FormDefinitionRepository.class);
     private final AssetFileRepository assetFileRepository = Mockito.mock(AssetFileRepository.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final FormLoadDataHydrationService hydrationService = new FormLoadDataHydrationService(List.of(), objectMapper);
 
     private final WorkflowDefinitionService service = new WorkflowDefinitionService(
             workflowRepository,
             formRepository,
             assetFileRepository,
+          hydrationService,
             objectMapper
     );
 
@@ -300,6 +305,61 @@ class WorkflowDefinitionServiceTest {
         assertEquals(1, response.path("definition").path("controlSchema").path("layout").size());
         assertEquals("approvalDecision", response.path("definition").path("controlSchema").path("layout").get(0).path("stateKey").asString());
         assertTrue(response.path("definition").path("controlSchema").path("layout").get(0).path("required").asBoolean());
+    }
+
+    @Test
+    void resolveDefinitionView_mergesHydratedDataFromProvidersForRuleEvaluation() throws Exception {
+        FormLoadDataProvider provider = new FormLoadDataProvider() {
+            @Override
+            public String id() {
+                return "mock-provider";
+            }
+
+            @Override
+            public ObjectNode load(FormLoadDataContext context) {
+                ObjectNode node = objectMapper.createObjectNode();
+                node.put("region", "EU");
+                return node;
+            }
+        };
+
+        WorkflowDefinitionService hydrationAwareService = new WorkflowDefinitionService(
+                workflowRepository,
+                formRepository,
+                assetFileRepository,
+                new FormLoadDataHydrationService(List.of(provider), objectMapper),
+                objectMapper
+        );
+
+        WorkflowDefinitionEntity entity = buildEntity("hydration", """
+                {
+                  "id": "hydration",
+                  "controlSchema": {
+                    "layout": [
+                      {"stateKey": "approvalDecision", "pointer": "#/properties/approvalDecision", "widget": "select"}
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "r-require-eu",
+                      "scope": "form",
+                      "target": "approvalDecision",
+                      "effect": "required",
+                      "value": true,
+                      "when": {"fact": "data.region", "op": "eq", "value": "EU"}
+                    }
+                  ]
+                }
+                """);
+
+        when(workflowRepository.findByDefinitionKeyAndActiveTrue("hydration")).thenReturn(Optional.of(entity));
+
+        WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
+        request.setData(objectMapper.createObjectNode());
+
+        ObjectNode response = hydrationAwareService.resolveDefinitionView("hydration", request).orElseThrow();
+
+        assertTrue(response.path("definition").path("controlSchema").path("layout").get(0).path("required").asBoolean(false));
     }
 
     private WorkflowDefinitionEntity buildEntity(String definitionKey, String definitionJson) throws Exception {

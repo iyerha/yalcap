@@ -20,6 +20,11 @@
     <h1>Yalcap Definition Designer</h1>
 
     <section>
+        <a href="/designer/form" style="margin-right: 12px;">Open form designer</a>
+        <a href="/designer/workflow">Open workflow designer</a>
+    </section>
+
+    <section>
         <label for="definition-key">Definition key</label>
         <input id="definition-key" name="definitionKey" th:value="${definitionKey}" style="width: 320px; margin-left: 12px;" />
         <button hx-get="/designer/active" hx-trigger="click" hx-target="#active-definition" hx-swap="outerHTML" hx-include="#definition-key">Load active</button>

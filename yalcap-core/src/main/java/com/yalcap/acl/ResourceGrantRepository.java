@@ -6,5 +6,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ResourceGrantRepository extends CrudRepository<ResourceGrantEntity, UUID> {
-    List<ResourceGrantEntity> findByResourceIdAndPrincipalTypeAndPrincipalKey(UUID resourceId, String principalType, String principalKey);
+    List<ResourceGrantEntity> findByResourceIdAndSubjectTypeAndSubjectKey(UUID resourceId, String subjectType, String subjectKey);
 }

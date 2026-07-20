@@ -149,7 +149,7 @@ databaseChangeLog:
       author: yalcap
       changes:
         - createTable:
-            tableName: principal_group
+            tableName: user_group
             columns:
               - column:
                   name: id
@@ -178,18 +178,99 @@ databaseChangeLog:
                   type: timestamp with time zone
                   defaultValueComputed: CURRENT_TIMESTAMP
         - addForeignKeyConstraint:
-            baseTableName: principal_group
+            baseTableName: user_group
             baseColumnNames: tenant_id
             referencedTableName: tenant
             referencedColumnNames: id
-            constraintName: fk_principal_group_tenant
+            constraintName: fk_user_group_tenant
         - sql:
-            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_principal_group_tenant_key ON principal_group (tenant_id, group_key);
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_user_group_tenant_key ON user_group (tenant_id, group_key);
         - sql:
-            sql: ALTER TABLE principal_group ENABLE ROW LEVEL SECURITY;
+            sql: ALTER TABLE user_group ENABLE ROW LEVEL SECURITY;
         - sql:
             sql: |
-              CREATE POLICY principal_group_tenant_isolation ON principal_group
+              CREATE POLICY user_group_tenant_isolation ON user_group
+              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
+              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
+
+  - changeSet:
+      id: 0016b-create-principal-user-table
+      author: yalcap
+      changes:
+        - createTable:
+            tableName: user_account
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: uuidv7()
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_key
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: login_name
+                  type: varchar(160)
+              - column:
+                  name: primary_email
+                  type: varchar(320)
+              - column:
+                  name: display_name
+                  type: varchar(200)
+              - column:
+                  name: source_type
+                  type: varchar(40)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: external_ref
+                  type: varchar(200)
+              - column:
+                  name: status
+                  type: varchar(20)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: user_account
+            baseColumnNames: tenant_id
+            referencedTableName: tenant
+            referencedColumnNames: id
+            constraintName: fk_user_account_tenant
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_user_account_tenant_user_key ON user_account (tenant_id, user_key);
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_user_account_tenant_login_name ON user_account (tenant_id, login_name) WHERE login_name IS NOT NULL;
+        - sql:
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_user_account_tenant_source_external_ref ON user_account (tenant_id, source_type, external_ref) WHERE external_ref IS NOT NULL;
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_user_account_tenant_email ON user_account (tenant_id, primary_email);
+        - sql:
+            sql: ALTER TABLE user_account ENABLE ROW LEVEL SECURITY;
+        - sql:
+            sql: |
+              CREATE POLICY user_account_tenant_isolation ON user_account
               USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
               WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
@@ -218,6 +299,9 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
+                  name: user_id
+                  type: uuid
+              - column:
                   name: user_key
                   type: varchar(160)
                   constraints:
@@ -235,13 +319,21 @@ databaseChangeLog:
         - addForeignKeyConstraint:
             baseTableName: group_member
             baseColumnNames: group_id
-            referencedTableName: principal_group
+            referencedTableName: user_group
             referencedColumnNames: id
             constraintName: fk_group_member_group
+        - addForeignKeyConstraint:
+            baseTableName: group_member
+            baseColumnNames: user_id
+            referencedTableName: user_account
+            referencedColumnNames: id
+            constraintName: fk_group_member_user
         - sql:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_group_member_tenant_group_user ON group_member (tenant_id, group_id, user_key);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_group_member_tenant_user ON group_member (tenant_id, user_key);
+        - sql:
+            sql: CREATE INDEX IF NOT EXISTS idx_group_member_tenant_user_id ON group_member (tenant_id, user_id);
         - sql:
             sql: ALTER TABLE group_member ENABLE ROW LEVEL SECURITY;
         - sql:
@@ -255,7 +347,7 @@ databaseChangeLog:
       author: yalcap
       changes:
         - createTable:
-            tableName: role_definition
+            tableName: acl_role
             columns:
               - column:
                   name: id
@@ -289,18 +381,18 @@ databaseChangeLog:
                   type: timestamp with time zone
                   defaultValueComputed: CURRENT_TIMESTAMP
         - addForeignKeyConstraint:
-            baseTableName: role_definition
+            baseTableName: acl_role
             baseColumnNames: tenant_id
             referencedTableName: tenant
             referencedColumnNames: id
-            constraintName: fk_role_definition_tenant
+            constraintName: fk_acl_role_tenant
         - sql:
-            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_definition_tenant_key ON role_definition (tenant_id, role_key);
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_acl_role_tenant_key ON acl_role (tenant_id, role_key);
         - sql:
-            sql: ALTER TABLE role_definition ENABLE ROW LEVEL SECURITY;
+            sql: ALTER TABLE acl_role ENABLE ROW LEVEL SECURITY;
         - sql:
             sql: |
-              CREATE POLICY role_definition_tenant_isolation ON role_definition
+              CREATE POLICY acl_role_tenant_isolation ON acl_role
               USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
               WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
@@ -342,7 +434,7 @@ databaseChangeLog:
         - addForeignKeyConstraint:
             baseTableName: role_permission
             baseColumnNames: role_id
-            referencedTableName: role_definition
+            referencedTableName: acl_role
             referencedColumnNames: id
             constraintName: fk_role_permission_role
         - sql:
@@ -378,12 +470,12 @@ databaseChangeLog:
                   name: scope_resource_id
                   type: uuid
               - column:
-                  name: principal_type
+                  name: subject_type
                   type: varchar(20)
                   constraints:
                     nullable: false
               - column:
-                  name: principal_key
+                  name: subject_key
                   type: varchar(160)
                   constraints:
                     nullable: false
@@ -419,13 +511,13 @@ databaseChangeLog:
         - addForeignKeyConstraint:
             baseTableName: role_assignment
             baseColumnNames: role_id
-            referencedTableName: role_definition
+            referencedTableName: acl_role
             referencedColumnNames: id
             constraintName: fk_role_assignment_role
         - sql:
-            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_assignment_tenant_scope_principal_role ON role_assignment (tenant_id, scope_resource_id, principal_type, principal_key, role_id);
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_assignment_tenant_scope_subject_role ON role_assignment (tenant_id, scope_resource_id, subject_type, subject_key, role_id);
         - sql:
-            sql: CREATE INDEX IF NOT EXISTS idx_role_assignment_tenant_principal ON role_assignment (tenant_id, principal_type, principal_key);
+            sql: CREATE INDEX IF NOT EXISTS idx_role_assignment_tenant_subject ON role_assignment (tenant_id, subject_type, subject_key);
         - sql:
             sql: ALTER TABLE role_assignment ENABLE ROW LEVEL SECURITY;
         - sql:
@@ -459,12 +551,12 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: principal_type
+                  name: subject_type
                   type: varchar(20)
                   constraints:
                     nullable: false
               - column:
-                  name: principal_key
+                  name: subject_key
                   type: varchar(160)
                   constraints:
                     nullable: false
@@ -503,9 +595,9 @@ databaseChangeLog:
             referencedColumnNames: id
             constraintName: fk_resource_grant_resource
         - sql:
-            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_resource_grant_tenant_resource_principal_permission ON resource_grant (tenant_id, resource_id, principal_type, principal_key, permission_key);
+            sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_resource_grant_tenant_resource_subject_permission ON resource_grant (tenant_id, resource_id, subject_type, subject_key, permission_key);
         - sql:
-            sql: CREATE INDEX IF NOT EXISTS idx_resource_grant_tenant_principal_resource ON resource_grant (tenant_id, principal_type, principal_key, resource_id);
+            sql: CREATE INDEX IF NOT EXISTS idx_resource_grant_tenant_subject_resource ON resource_grant (tenant_id, subject_type, subject_key, resource_id);
         - sql:
             sql: ALTER TABLE resource_grant ENABLE ROW LEVEL SECURITY;
         - sql:

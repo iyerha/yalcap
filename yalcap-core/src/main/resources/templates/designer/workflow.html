@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Workflow Designer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/drawflow.min.js"></script>
+    <script defer th:src="@{/js/designer/workflow/designer-workflow-schema.js}" src="/js/designer/workflow/designer-workflow-schema.js"></script>
+    <script defer th:src="@{/js/designer/workflow/designer-workflow-properties.js}" src="/js/designer/workflow/designer-workflow-properties.js"></script>
+    <script defer th:src="@{/js/designer/workflow/designer-workflow-palette.js}" src="/js/designer/workflow/designer-workflow-palette.js"></script>
+    <script defer th:src="@{/js/designer/workflow/designer-workflow-canvas.js}" src="/js/designer/workflow/designer-workflow-canvas.js"></script>
+    <script defer th:src="@{/js/designer/workflow/designer-workflow.js}" src="/js/designer/workflow/designer-workflow.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
+    <link rel="stylesheet" th:href="@{/css/designer/workflow/designer-workflow.css}" href="/css/designer/workflow/designer-workflow.css" />
+</head>
+<body>
+    <div x-data="workflowDesigner()" x-init="init()" class="page">
+        <header>
+            <h1>Workflow Designer</h1>
+            <p>Define steps, assignees, and transitions. Publish as a workflow definition.</p>
+        </header>
+
+        <section class="card" x-show="publishMessage" x-cloak>
+            <p><strong x-text="publishMessage"></strong></p>
+        </section>
+
+        <section class="toolbar">
+            <label for="definitionKey">Definition key</label>
+            <input id="definitionKey" x-model="definitionKey" />
+            <button type="button" @click="generate()">Refresh JSON</button>
+        </section>
+
+        <main class="layout" :class="{ 'palette-collapsed': paletteCollapsed, 'properties-collapsed': propertiesCollapsed }">
+            <aside class="card palette side-panel" :class="{ 'pane-collapsed': paletteCollapsed }">
+                <div class="panel-header">
+                    <h3 x-show="!paletteCollapsed" x-cloak>Palette</h3>
+                    <button type="button" class="pane-toggle-btn" @click="togglePaletteCollapsed()" :title="paletteCollapsed ? 'Expand palette' : 'Collapse palette'" :aria-label="paletteCollapsed ? 'Expand palette' : 'Collapse palette'">
+                        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" :class="paletteCollapsed ? 'chevron-right' : 'chevron-left'">
+                            <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </button>
+                </div>
+                <p class="subtle" x-show="!paletteCollapsed" x-cloak>Drag a step type into the canvas.</p>
+                <div class="palette-list">
+                    <div class="palette-item" data-step-type="form">
+                        <span class="palette-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
+                                <rect x="5" y="4" width="14" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+                                <path d="M8 9h8M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                            </svg>
+                        </span>
+                        <span class="palette-label" x-show="!paletteCollapsed" x-cloak>Form step</span>
+                    </div>
+                    <div class="palette-item" data-step-type="service">
+                        <span class="palette-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
+                                <rect x="4" y="6" width="16" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+                                <path d="M8 10h8M8 14h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                            </svg>
+                        </span>
+                        <span class="palette-label" x-show="!paletteCollapsed" x-cloak>Service step</span>
+                    </div>
+                    <div class="palette-item" data-step-type="decision">
+                        <span class="palette-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
+                                <path d="M12 3l8 9-8 9-8-9 8-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+                            </svg>
+                        </span>
+                        <span class="palette-label" x-show="!paletteCollapsed" x-cloak>Decision step</span>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="card canvas-card">
+                <h3>Workflow Canvas</h3>
+                <div id="drawflowCanvas"></div>
+            </section>
+
+            <section class="card property-card side-panel" :class="{ 'pane-collapsed': propertiesCollapsed }">
+                <div class="panel-header">
+                    <h3 x-show="!propertiesCollapsed" x-cloak>Step Properties</h3>
+                    <button type="button" class="pane-toggle-btn" @click="togglePropertiesCollapsed()" :title="propertiesCollapsed ? 'Expand properties' : 'Collapse properties'" :aria-label="propertiesCollapsed ? 'Expand properties' : 'Collapse properties'">
+                        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" :class="propertiesCollapsed ? 'chevron-left' : 'chevron-right'">
+                            <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <template x-if="propertiesCollapsed">
+                    <p class="subtle" x-cloak x-show="propertiesCollapsed">Select a step to edit its properties.</p>
+                </template>
+
+                <template x-if="!propertiesCollapsed">
+                    <div>
+                        <template x-if="selectedStepDraft">
+                            <div>
+                                <label>Step id</label>
+                                <input x-model="selectedStepDraft.id" @input="syncSelectedStep()" />
+
+                                <label>Title</label>
+                                <input x-model="selectedStepDraft.title" @input="syncSelectedStep()" />
+
+                                <label>Type</label>
+                                <select x-model="selectedStepDraft.type" @change="syncSelectedStep()">
+                                    <option value="form">form</option>
+                                    <option value="service">service</option>
+                                    <option value="decision">decision</option>
+                                </select>
+
+                                <template x-if="selectedStepDraft.type === 'form'">
+                                    <div>
+                                        <label>Assignee kind</label>
+                                        <select x-model="selectedStepDraft.assignee.kind" @change="syncSelectedStep()">
+                                            <option value="INTERNAL_USER">INTERNAL_USER</option>
+                                            <option value="INTERNAL_GROUP">INTERNAL_GROUP</option>
+                                            <option value="EXTERNAL_EMAIL">EXTERNAL_EMAIL</option>
+                                        </select>
+
+                                        <label>Assignee value</label>
+                                        <input x-model="selectedStepDraft.assignee.value" @input="syncSelectedStep()" placeholder="user/group/email or expression" />
+                                    </div>
+                                </template>
+
+                                <template x-if="selectedStepDraft.type !== 'decision'">
+                                    <div>
+                                        <label>Next step id (derived from connections)</label>
+                                        <input x-model="selectedStepDraft.next" disabled />
+                                    </div>
+                                </template>
+
+                                <template x-if="selectedStepDraft.type === 'decision'">
+                                    <div>
+                                        <label>Condition logic (JSON)</label>
+                                        <textarea rows="5" x-model="selectedStepDraft.conditionJson" @input="syncSelectedStep()" placeholder='{"==":[{"var":"data.status"},"approved"]}'></textarea>
+                                        <p class="subtle" x-show="decisionConditionError" x-text="decisionConditionError"></p>
+
+                                        <label>Action 1 label</label>
+                                        <input x-model="selectedStepDraft.transitionLabels.output_1" @input="syncSelectedStep()" placeholder="Approve" />
+
+                                        <label>Action 1 target (derived from connector 1)</label>
+                                        <input :value="selectedStepDraft.transitions.output_1 || ''" disabled />
+
+                                        <label>Action 2 label</label>
+                                        <input x-model="selectedStepDraft.transitionLabels.output_2" @input="syncSelectedStep()" placeholder="Reject" />
+
+                                        <label>Action 2 target (derived from connector 2)</label>
+                                        <input :value="selectedStepDraft.transitions.output_2 || ''" disabled />
+                                    </div>
+                                </template>
+
+                                <button type="button" class="danger" @click="removeSelectedNode()">Remove step</button>
+                            </div>
+                        </template>
+
+                        <template x-if="!selectedStepDraft">
+                            <p>Select a node in the canvas to edit its properties.</p>
+                        </template>
+                    </div>
+                </template>
+            </section>
+
+            <section class="card json-card">
+                <h3>Definition JSON</h3>
+                <textarea x-model="definitionJson" rows="20"></textarea>
+
+                <form method="post"
+                    th:action="${workflowPublishAction}"
+                        action="/designer/workflow/publish">
+                    <input type="hidden" name="definitionKey" x-model="definitionKey" />
+                    <input type="hidden" name="definition" x-model="definitionJson" />
+
+                    <label>Created by</label>
+                    <input name="createdBy" value="designer" />
+
+                    <label>Change message</label>
+                    <input name="changeMessage" value="Created via workflow designer" />
+
+                    <button type="submit">Publish workflow</button>
+                </form>
+            </section>
+        </main>
+
+        <script th:inline="javascript">
+            window.workflowDesignerInitialDefinition = /*[[${activeDefinition != null ? activeDefinition.definition : null}]]*/ null;
+            window.workflowDesignerInitialKey = /*[[${definitionKey}]]*/ 'example-review';
+        </script>
+    </div>
+</body>
+</html>

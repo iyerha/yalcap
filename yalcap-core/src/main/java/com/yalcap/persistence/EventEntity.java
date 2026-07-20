@@ -1,5 +1,6 @@
 package com.yalcap.persistence;
 
+import com.yalcap.engine.ActorType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
@@ -53,7 +54,9 @@ public class EventEntity implements TenantAware {
     public String getActorId() { return actorId; }
     public void setActorId(String actorId) { this.actorId = actorId; }
     public String getActorType() { return actorType; }
+    public ActorType getActorTypeValue() { return ActorType.valueOf(actorType); }
     public void setActorType(String actorType) { this.actorType = actorType; }
+    public void setActorType(ActorType actorType) { this.actorType = actorType.name(); }
     public JsonNode getPayload() { return payload; }
     public void setPayload(JsonNode payload) { this.payload = payload; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

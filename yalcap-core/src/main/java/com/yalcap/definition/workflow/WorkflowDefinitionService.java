@@ -1,5 +1,8 @@
 package com.yalcap.definition.workflow;
 
+import com.yalcap.definition.form.load.FormLoadDataContext;
+import com.yalcap.definition.form.load.FormLoadDataHydrationService;
+import com.yalcap.definition.form.load.FormLoadDataPhase;
 import com.yalcap.definition.form.FormDefinitionEntity;
 import com.yalcap.definition.form.FormDefinitionRepository;
 import com.yalcap.persistence.TenantContext;
@@ -16,7 +19,6 @@ import java.util.Optional;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Set;
-import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -33,15 +35,18 @@ public class WorkflowDefinitionService {
     private final WorkflowDefinitionRepository repository;
     private final FormDefinitionRepository formDefinitionRepository;
     private final com.yalcap.asset.AssetFileRepository assetFileRepository;
+    private final FormLoadDataHydrationService formLoadDataHydrationService;
     private final ObjectMapper objectMapper;
 
     public WorkflowDefinitionService(WorkflowDefinitionRepository repository,
                                    FormDefinitionRepository formDefinitionRepository,
                                    com.yalcap.asset.AssetFileRepository assetFileRepository,
+                                   FormLoadDataHydrationService formLoadDataHydrationService,
                                    ObjectMapper objectMapper) {
         this.repository = repository;
         this.formDefinitionRepository = formDefinitionRepository;
         this.assetFileRepository = assetFileRepository;
+        this.formLoadDataHydrationService = formLoadDataHydrationService;
         this.objectMapper = objectMapper;
     }
 
@@ -449,8 +454,18 @@ public class WorkflowDefinitionService {
         }
 
         ObjectNode definitionCopy = ((ObjectNode) definition).deepCopy();
-        JsonNode inputData = request != null ? request.getData() : null;
-        ObjectNode context = buildRuleContext(definitionEntity, request, inputData);
+        ObjectNode inputData = asObjectNode(request != null ? request.getData() : null);
+        ObjectNode hydratedData = formLoadDataHydrationService.hydrate(new FormLoadDataContext(
+            safeString(definitionEntity.getDefinitionKey()),
+            request != null ? safeString(request.getStepId()) : "",
+            request != null ? safeString(request.getUserId()) : "",
+            request != null && request.getUserGroups() != null ? request.getUserGroups() : List.of(),
+            definitionEntity.getTenantId(),
+            inputData.deepCopy(),
+            FormLoadDataPhase.FORM_OPEN
+        ));
+        ObjectNode mergedData = mergeData(inputData, hydratedData);
+        ObjectNode context = buildRuleContext(definitionEntity, request, mergedData);
 
         Map<String, RuleEffectState> formRuleState = evaluateRules(definitionCopy.path("rules"), "form", context);
         Map<String, RuleEffectState> stepRuleState = evaluateRules(definitionCopy.path("rules"), "step", context);
@@ -477,7 +492,7 @@ public class WorkflowDefinitionService {
             }
         }
 
-        ObjectNode projectedData = projectReadableData(inputData, readablePointers);
+        ObjectNode projectedData = projectReadableData(mergedData, readablePointers);
 
         ObjectNode response = objectMapper.createObjectNode();
         response.put("definitionKey", definitionEntity.getDefinitionKey());
@@ -543,6 +558,21 @@ public class WorkflowDefinitionService {
         }
 
         return context;
+    }
+
+    private ObjectNode asObjectNode(JsonNode data) {
+        if (data != null && data.isObject()) {
+            return ((ObjectNode) data).deepCopy();
+        }
+        return objectMapper.createObjectNode();
+    }
+
+    private ObjectNode mergeData(ObjectNode baseData, ObjectNode hydratedData) {
+        ObjectNode merged = baseData == null ? objectMapper.createObjectNode() : baseData.deepCopy();
+        if (hydratedData != null) {
+            merged.setAll(hydratedData);
+        }
+        return merged;
     }
 
     private Map<String, RuleEffectState> evaluateRules(JsonNode rulesNode,

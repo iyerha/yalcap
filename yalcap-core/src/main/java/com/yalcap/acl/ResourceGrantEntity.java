@@ -20,11 +20,11 @@ public class ResourceGrantEntity implements TenantAware {
     @Column("resource_id")
     private UUID resourceId;
 
-    @Column("principal_type")
-    private String principalType;
+    @Column("subject_type")
+    private String subjectType;
 
-    @Column("principal_key")
-    private String principalKey;
+    @Column("subject_key")
+    private String subjectKey;
 
     @Column("permission_key")
     private String permissionKey;
@@ -64,20 +64,28 @@ public class ResourceGrantEntity implements TenantAware {
         this.resourceId = resourceId;
     }
 
-    public String getPrincipalType() {
-        return principalType;
+    public String getSubjectType() {
+        return subjectType;
     }
 
-    public void setPrincipalType(String principalType) {
-        this.principalType = principalType;
+    public SubjectType getSubjectTypeValue() {
+        return SubjectType.valueOf(subjectType);
     }
 
-    public String getPrincipalKey() {
-        return principalKey;
+    public void setSubjectType(String subjectType) {
+        this.subjectType = subjectType;
     }
 
-    public void setPrincipalKey(String principalKey) {
-        this.principalKey = principalKey;
+    public void setSubjectType(SubjectType subjectType) {
+        this.subjectType = subjectType.name();
+    }
+
+    public String getSubjectKey() {
+        return subjectKey;
+    }
+
+    public void setSubjectKey(String subjectKey) {
+        this.subjectKey = subjectKey;
     }
 
     public String getPermissionKey() {
