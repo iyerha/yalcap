@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.HashSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -30,7 +31,12 @@ public class WorkflowDefinitionService {
         private static final Set<String> JSON_LOGIC_OPERATORS = Set.of(
             "var", "==", "!=", ">", ">=", "<", "<=", "in", "and", "or", "!", "matches"
         );
+    private static final Set<String> ALLOWED_API_METHODS = Set.of("get", "post", "put", "patch", "delete");
+    private static final Set<String> ALLOWED_API_TRIGGERS = Set.of("change", "input", "blur", "submit", "click");
+    private static final Set<String> ALLOWED_API_SWAPS = Set.of("innerHTML", "outerHTML", "beforeend", "afterend");
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$");
+    private static final Pattern API_ENDPOINT_PATTERN = Pattern.compile("^/api/[A-Za-z0-9_./\\-?=&:%]*$");
+    private static final Pattern API_TARGET_PATTERN = Pattern.compile("^[#.][A-Za-z][A-Za-z0-9_:\\-.]*$");
 
     private final WorkflowDefinitionRepository repository;
     private final FormDefinitionRepository formDefinitionRepository;
@@ -109,6 +115,7 @@ public class WorkflowDefinitionService {
                                            String changeMessage) {
         JsonNode preparedDefinition = prepareDefinition(definition);
         validateTheme(preparedDefinition);
+        validateAndNormalizeRuleActions(preparedDefinition);
 
         Optional<WorkflowDefinitionEntity> activeDefinition = repository.findByDefinitionKeyAndActiveTrue(definitionKey);
         int nextVersion = activeDefinition.map(entry -> entry.getVersionNumber() + 1).orElse(1);
@@ -215,6 +222,18 @@ public class WorkflowDefinitionService {
 
         if (!hasChildren && !hasColumns) {
             throw new IllegalArgumentException(controlPath + " requires children or columns for repeat widget");
+        }
+
+        if (hasChildren) {
+            if (children.size() != 1) {
+                throw new IllegalArgumentException(controlPath + ".children must contain exactly one item for repeat widget");
+            }
+
+            JsonNode onlyChild = children.get(0);
+            String childWidget = onlyChild == null ? "" : onlyChild.path("widget").asString("").trim().toLowerCase();
+            if ("repeat".equals(childWidget) || "section".equals(childWidget)) {
+                throw new IllegalArgumentException(controlPath + ".children[0] must be a group or scalar control for repeat widget");
+            }
         }
 
         validateMinMaxBounds(control, controlPath, "minItems", "maxItems");
@@ -469,6 +488,10 @@ public class WorkflowDefinitionService {
 
         Map<String, RuleEffectState> formRuleState = evaluateRules(definitionCopy.path("rules"), "form", context);
         Map<String, RuleEffectState> stepRuleState = evaluateRules(definitionCopy.path("rules"), "step", context);
+        ArrayNode formApiActions = evaluateApiActions(definitionCopy.path("rules"), "form", context);
+        ArrayNode stepApiActions = evaluateApiActions(definitionCopy.path("rules"), "step", context);
+        Map<String, ObjectNode> formHtmxByTarget = buildHtmxAttributesByTarget(formApiActions);
+        Map<String, ObjectNode> stepHtmxByTarget = buildHtmxAttributesByTarget(stepApiActions);
 
         ObjectNode controlSchema = resolveControlSchema(definitionCopy);
         Set<String> readablePointers = new HashSet<>();
@@ -484,6 +507,8 @@ public class WorkflowDefinitionService {
                         filteredLayout,
                         formRuleState,
                         stepRuleState,
+                    formHtmxByTarget,
+                    stepHtmxByTarget,
                         readablePointers,
                         readableTargets,
                         writableTargets
@@ -505,7 +530,203 @@ public class WorkflowDefinitionService {
         permissions.set("readable", readableTargets);
         permissions.set("writable", writableTargets);
 
+        ObjectNode runtime = response.putObject("runtime");
+        ObjectNode runtimeApiActions = runtime.putObject("apiActions");
+        runtimeApiActions.set("form", formApiActions);
+        runtimeApiActions.set("step", stepApiActions);
+
         return response;
+    }
+
+    private void validateAndNormalizeRuleActions(JsonNode definition) {
+        if (definition == null || !definition.isObject()) {
+            return;
+        }
+
+        JsonNode rulesNode = definition.path("rules");
+        if (!rulesNode.isArray()) {
+            return;
+        }
+
+        for (int i = 0; i < rulesNode.size(); i += 1) {
+            JsonNode ruleNode = rulesNode.get(i);
+            if (ruleNode == null || !ruleNode.isObject()) {
+                continue;
+            }
+
+            ObjectNode rule = (ObjectNode) ruleNode;
+            JsonNode actionsNode = rule.path("actions");
+            if (!actionsNode.isArray()) {
+                continue;
+            }
+
+            for (int j = 0; j < actionsNode.size(); j += 1) {
+                JsonNode actionNode = actionsNode.get(j);
+                if (actionNode == null || !actionNode.isObject()) {
+                    continue;
+                }
+                if (!isApiAction(actionNode)) {
+                    continue;
+                }
+
+                String contextPath = "rules[" + i + "].actions[" + j + "]";
+                ObjectNode normalized = normalizeApiAction((ObjectNode) actionNode, contextPath, true);
+                ((ArrayNode) actionsNode).set(j, normalized);
+            }
+        }
+    }
+
+    private ArrayNode evaluateApiActions(JsonNode rulesNode,
+                                         String scope,
+                                         ObjectNode context) {
+        ArrayNode out = objectMapper.createArrayNode();
+        if (!rulesNode.isArray()) {
+            return out;
+        }
+
+        Map<String, ObjectNode> deduped = new LinkedHashMap<>();
+        for (int i = 0; i < rulesNode.size(); i += 1) {
+            JsonNode rule = rulesNode.get(i);
+            if (rule == null || !rule.isObject()) {
+                continue;
+            }
+
+            String ruleScope = safeString(rule.path("scope").asString());
+            if (!scope.equals(ruleScope)) {
+                continue;
+            }
+
+            JsonNode when = rule.path("when");
+            if (!evaluateCondition(when, context)) {
+                continue;
+            }
+
+            JsonNode actionsNode = rule.path("actions");
+            if (!actionsNode.isArray()) {
+                continue;
+            }
+
+            for (int j = 0; j < actionsNode.size(); j += 1) {
+                JsonNode actionNode = actionsNode.get(j);
+                if (actionNode == null || !actionNode.isObject() || !isApiAction(actionNode)) {
+                    continue;
+                }
+
+                ObjectNode normalized;
+                try {
+                    normalized = normalizeApiAction((ObjectNode) actionNode,
+                            "rules[" + i + "].actions[" + j + "]", false);
+                } catch (IllegalArgumentException ex) {
+                    continue;
+                }
+
+                String key = safeString(normalized.path("endpoint").asString()) + "|"
+                    + safeString(normalized.path("method").asString()) + "|"
+                    + safeString(normalized.path("trigger").asString()) + "|"
+                    + safeString(normalized.path("target").asString()) + "|"
+                    + safeString(normalized.path("swap").asString()) + "|"
+                    + safeString(normalized.path("valsTemplate").asString());
+                deduped.putIfAbsent(key, normalized);
+            }
+        }
+
+        deduped.values().forEach(out::add);
+        return out;
+    }
+
+    private boolean isApiAction(JsonNode actionNode) {
+        if (actionNode == null || !actionNode.isObject()) {
+            return false;
+        }
+        String kind = safeString(actionNode.path("kind").asString()).toLowerCase();
+        if ("api".equals(kind)) {
+            return true;
+        }
+        return !safeString(actionNode.path("endpoint").asString()).isEmpty();
+    }
+
+    private ObjectNode normalizeApiAction(ObjectNode actionNode,
+                                          String contextPath,
+                                          boolean strict) {
+        String endpoint = safeString(actionNode.path("endpoint").asString());
+        if (endpoint.isEmpty()) {
+            if (strict) {
+                throw new IllegalArgumentException(contextPath + ".endpoint is required for API actions");
+            }
+            endpoint = "";
+        }
+        if (!endpoint.isEmpty() && !API_ENDPOINT_PATTERN.matcher(endpoint).matches()) {
+            throw new IllegalArgumentException(contextPath + ".endpoint must match /api/* and contain safe URL characters");
+        }
+
+        String method = safeString(actionNode.path("method").asString()).toLowerCase();
+        if (method.isEmpty()) {
+            method = "get";
+        }
+        if (!ALLOWED_API_METHODS.contains(method)) {
+            throw new IllegalArgumentException(contextPath + ".method must be one of " + ALLOWED_API_METHODS);
+        }
+
+        String trigger = safeString(actionNode.path("trigger").asString()).toLowerCase();
+        if (trigger.isEmpty()) {
+            trigger = "change";
+        }
+        if (!ALLOWED_API_TRIGGERS.contains(trigger)) {
+            throw new IllegalArgumentException(contextPath + ".trigger must be one of " + ALLOWED_API_TRIGGERS);
+        }
+
+        String target = safeString(actionNode.path("target").asString());
+        if (!target.isEmpty() && !API_TARGET_PATTERN.matcher(target).matches()) {
+            throw new IllegalArgumentException(contextPath + ".target must be a safe CSS id/class selector like #id or .class");
+        }
+
+        String swap = safeString(actionNode.path("swap").asString());
+        if (swap.isEmpty()) {
+            swap = "innerHTML";
+        }
+        if (!ALLOWED_API_SWAPS.contains(swap)) {
+            throw new IllegalArgumentException(contextPath + ".swap must be one of " + ALLOWED_API_SWAPS);
+        }
+
+        String valsTemplate = safeString(actionNode.path("valsTemplate").asString());
+        if (valsTemplate.length() > 1000) {
+            throw new IllegalArgumentException(contextPath + ".valsTemplate is too long (max 1000 chars)");
+        }
+
+        ObjectNode normalized = objectMapper.createObjectNode();
+        normalized.put("kind", "api");
+        normalized.put("endpoint", endpoint);
+        normalized.put("method", method);
+        normalized.put("trigger", trigger);
+        normalized.put("target", target);
+        normalized.put("swap", swap);
+        normalized.put("valsTemplate", valsTemplate);
+        normalized.set("htmx", buildServerHtmxAttributes(endpoint, method, trigger, target, swap, valsTemplate));
+        return normalized;
+    }
+
+    private ObjectNode buildServerHtmxAttributes(String endpoint,
+                                                 String method,
+                                                 String trigger,
+                                                 String target,
+                                                 String swap,
+                                                 String valsTemplate) {
+        ObjectNode attrs = objectMapper.createObjectNode();
+        attrs.put("hxTrigger", trigger);
+        attrs.put("hxSwap", swap);
+        if ("get".equals(method)) {
+            attrs.put("hxGet", endpoint);
+        } else {
+            attrs.put("hxPost", endpoint);
+            attrs.put("hxMethod", method);
+        }
+        if (!target.isEmpty()) {
+            attrs.put("hxTarget", target);
+        }
+        if (!valsTemplate.isEmpty()) {
+            attrs.put("hxVals", valsTemplate);
+        }
+        return attrs;
     }
 
     private ObjectNode resolveControlSchema(ObjectNode definition) {
@@ -622,8 +843,17 @@ public class WorkflowDefinitionService {
             return;
         }
 
-        boolean value = actionNode.path("value").asBoolean(false);
         RuleEffectState state = targetState.computeIfAbsent(target, ignored -> new RuleEffectState());
+        if ("collapse".equals(effect)) {
+            state.applyCollapsed(true);
+            return;
+        }
+        if ("expand".equals(effect)) {
+            state.applyCollapsed(false);
+            return;
+        }
+
+        boolean value = actionNode.path("value").asBoolean(false);
         state.apply(effect, value);
     }
 
@@ -988,6 +1218,8 @@ public class WorkflowDefinitionService {
                               ArrayNode targetLayout,
                               Map<String, RuleEffectState> formRuleState,
                               Map<String, RuleEffectState> stepRuleState,
+                              Map<String, ObjectNode> formHtmxByTarget,
+                              Map<String, ObjectNode> stepHtmxByTarget,
                               Set<String> readablePointers,
                               ArrayNode readableTargets,
                               ArrayNode writableTargets) {
@@ -1007,6 +1239,19 @@ public class WorkflowDefinitionService {
             copy.put("visible", true);
             copy.put("enabled", effectiveState.enabled);
             copy.put("required", effectiveState.required);
+            copy.put("collapsed", effectiveState.collapsed);
+            applyColumnVisibility(copy, target, formRuleState, stepRuleState);
+
+            if (!target.isEmpty()) {
+                ObjectNode htmx = stepHtmxByTarget.get(target);
+                if (htmx == null) {
+                    htmx = formHtmxByTarget.get(target);
+                }
+                if (htmx != null) {
+                    // Runtime-resolved HTMX attributes for server-side renderer consumption.
+                    copy.set("runtimeHtmx", htmx.deepCopy());
+                }
+            }
 
             JsonNode pointerNode = copy.get("pointer");
             if (pointerNode != null && pointerNode.isString()) {
@@ -1024,12 +1269,71 @@ public class WorkflowDefinitionService {
             if (children != null && children.isArray()) {
                 ArrayNode filteredChildren = objectMapper.createArrayNode();
                 filterLayout((ArrayNode) children, filteredChildren, formRuleState, stepRuleState,
+                    formHtmxByTarget, stepHtmxByTarget,
                         readablePointers, readableTargets, writableTargets);
                 copy.set("children", filteredChildren);
             }
 
             targetLayout.add(copy);
         }
+    }
+
+    private void applyColumnVisibility(ObjectNode control,
+                                       String controlTarget,
+                                       Map<String, RuleEffectState> formRuleState,
+                                       Map<String, RuleEffectState> stepRuleState) {
+        if (control == null) {
+            return;
+        }
+
+        JsonNode columnsNode = control.path("columns");
+        if (!columnsNode.isArray()) {
+            return;
+        }
+
+        for (JsonNode columnNode : columnsNode) {
+            if (!(columnNode instanceof ObjectNode column)) {
+                continue;
+            }
+
+            String key = safeString(column.path("key").asString());
+            if (key.isEmpty() || controlTarget.isEmpty()) {
+                continue;
+            }
+
+            String columnTarget = controlTarget + ".columns." + key;
+            RuleEffectState formState = formRuleState.get(columnTarget);
+            RuleEffectState stepState = stepRuleState.get(columnTarget);
+
+            boolean baseVisible = !column.has("visible") || column.path("visible").asBoolean(true);
+            boolean formVisible = formState != null && formState.visible != null ? formState.visible : baseVisible;
+            boolean stepVisible = stepState != null && stepState.visible != null ? stepState.visible : true;
+            boolean visible = formVisible && stepVisible;
+
+            column.put("visible", visible);
+        }
+    }
+
+    private Map<String, ObjectNode> buildHtmxAttributesByTarget(ArrayNode apiActions) {
+        Map<String, ObjectNode> out = new HashMap<>();
+        if (apiActions == null) {
+            return out;
+        }
+
+        for (JsonNode actionNode : apiActions) {
+            if (actionNode == null || !actionNode.isObject()) {
+                continue;
+            }
+
+            String target = safeString(actionNode.path("target").asString());
+            JsonNode htmxNode = actionNode.path("htmx");
+            if (target.isEmpty() || !htmxNode.isObject()) {
+                continue;
+            }
+
+            out.putIfAbsent(target, ((ObjectNode) htmxNode).deepCopy());
+        }
+        return out;
     }
 
     private String resolveTarget(ObjectNode control) {
@@ -1084,7 +1388,28 @@ public class WorkflowDefinitionService {
         boolean stepWritable = stepState != null && stepState.writable != null ? stepState.writable : true;
         boolean writable = readable && enabled && formWritable && stepWritable;
 
-        return new EffectiveControlState(visible, enabled, required, readable, writable);
+        boolean sectionWidget = "section".equals(safeString(control.path("widget").asString()));
+        boolean collapsible = sectionWidget && control.path("sectionCollapsible").asBoolean(false);
+        boolean baseCollapsed = collapsible && !control.path("sectionDefaultExpanded").asBoolean(true);
+        if (sectionWidget && control.has("collapsed")) {
+            baseCollapsed = control.path("collapsed").asBoolean(baseCollapsed);
+        }
+
+        boolean collapsed = false;
+        if (sectionWidget) {
+            collapsed = baseCollapsed;
+            if (formState != null && formState.collapsed != null) {
+                collapsed = formState.collapsed;
+            }
+            if (stepState != null && stepState.collapsed != null) {
+                collapsed = stepState.collapsed;
+            }
+            if (!collapsible) {
+                collapsed = false;
+            }
+        }
+
+        return new EffectiveControlState(visible, enabled, required, readable, writable, collapsed);
     }
 
     private ObjectNode projectReadableData(JsonNode data, Set<String> readablePointers) {
@@ -1165,6 +1490,7 @@ public class WorkflowDefinitionService {
         private Boolean required;
         private Boolean readable;
         private Boolean writable;
+        private Boolean collapsed;
 
         private void apply(String effect, boolean value) {
             switch (effect) {
@@ -1183,9 +1509,16 @@ public class WorkflowDefinitionService {
                 case "writable":
                     this.writable = value;
                     break;
+                case "collapsed":
+                    this.collapsed = value;
+                    break;
                 default:
                     break;
             }
+        }
+
+        private void applyCollapsed(boolean value) {
+            this.collapsed = value;
         }
     }
 
@@ -1195,17 +1528,20 @@ public class WorkflowDefinitionService {
         private final boolean required;
         private final boolean readable;
         private final boolean writable;
+        private final boolean collapsed;
 
         private EffectiveControlState(boolean visible,
                                       boolean enabled,
                                       boolean required,
                                       boolean readable,
-                                      boolean writable) {
+                                      boolean writable,
+                                      boolean collapsed) {
             this.visible = visible;
             this.enabled = enabled;
             this.required = required;
             this.readable = readable;
             this.writable = writable;
+            this.collapsed = collapsed;
         }
     }
 

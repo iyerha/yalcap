@@ -7,6 +7,7 @@ import com.yalcap.definition.form.load.FormLoadDataProvider;
 import com.yalcap.definition.form.FormDefinitionRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -17,6 +18,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -360,6 +362,166 @@ class WorkflowDefinitionServiceTest {
         ObjectNode response = hydrationAwareService.resolveDefinitionView("hydration", request).orElseThrow();
 
         assertTrue(response.path("definition").path("controlSchema").path("layout").get(0).path("required").asBoolean(false));
+    }
+
+    @Test
+    void resolveDefinitionView_appliesSectionCollapseAndExpandRuleEffects() throws Exception {
+        WorkflowDefinitionEntity entity = buildEntity("section-collapse", """
+                {
+                  "id": "section-collapse",
+                  "controlSchema": {
+                    "layout": [
+                      {
+                        "widget": "section",
+                        "stateKey": "reviewSection",
+                        "label": "Review",
+                        "sectionCollapsible": true,
+                        "sectionDefaultExpanded": true,
+                        "children": [
+                          {"widget": "text", "stateKey": "notes", "pointer": "#/properties/notes"}
+                        ]
+                      }
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "r-collapse-on-review",
+                      "scope": "form",
+                      "target": "reviewSection",
+                      "effect": "collapse",
+                      "when": {"fact": "workflow.stepId", "op": "eq", "value": "review"}
+                    },
+                    {
+                      "id": "r-expand-for-lead",
+                      "scope": "step",
+                      "target": "reviewSection",
+                      "effect": "expand",
+                      "when": {
+                        "all": [
+                          {"fact": "workflow.stepId", "op": "eq", "value": "review"},
+                          {"fact": "user.id", "op": "eq", "value": "lead"}
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        when(workflowRepository.findByDefinitionKeyAndActiveTrue("section-collapse")).thenReturn(Optional.of(entity));
+
+        WorkflowDefinitionService.ResolveDefinitionViewRequest reviewerRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
+        reviewerRequest.setStepId("review");
+        reviewerRequest.setUserId("reviewer");
+
+        ObjectNode reviewerResponse = service.resolveDefinitionView("section-collapse", reviewerRequest).orElseThrow();
+        assertTrue(reviewerResponse.path("definition").path("controlSchema").path("layout").get(0).path("collapsed").asBoolean(false));
+
+        WorkflowDefinitionService.ResolveDefinitionViewRequest leadRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
+        leadRequest.setStepId("review");
+        leadRequest.setUserId("lead");
+
+        ObjectNode leadResponse = service.resolveDefinitionView("section-collapse", leadRequest).orElseThrow();
+        assertFalse(leadResponse.path("definition").path("controlSchema").path("layout").get(0).path("collapsed").asBoolean(true));
+    }
+
+    @Test
+    void resolveDefinitionView_appliesColumnVisibilityRuleEffects() throws Exception {
+        WorkflowDefinitionEntity entity = buildEntity("table-column-visibility", """
+                {
+                  "id": "table-column-visibility",
+                  "controlSchema": {
+                    "layout": [
+                      {
+                        "widget": "repeat",
+                        "stateKey": "lineItems",
+                        "renderer": "table",
+                        "columns": [
+                          {"key": "sku", "title": "SKU", "type": "string", "visible": true},
+                          {"key": "amount", "title": "Amount", "type": "number", "visible": true}
+                        ]
+                      }
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "hide-amount-column",
+                      "scope": "form",
+                      "target": "lineItems.columns.amount",
+                      "effect": "visible",
+                      "value": false,
+                      "when": {"fact": "workflow.stepId", "op": "eq", "value": "review"}
+                    }
+                  ]
+                }
+                """);
+
+        when(workflowRepository.findByDefinitionKeyAndActiveTrue("table-column-visibility")).thenReturn(Optional.of(entity));
+
+        WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
+        request.setStepId("review");
+
+        ObjectNode response = service.resolveDefinitionView("table-column-visibility", request).orElseThrow();
+        JsonNode columns = response.path("definition").path("controlSchema").path("layout").get(0).path("columns");
+
+        assertTrue(columns.isArray());
+        assertTrue(columns.get(0).path("visible").asBoolean(true));
+        assertFalse(columns.get(1).path("visible").asBoolean(true));
+    }
+
+    @Test
+    void publishDefinition_rejectsRepeatWithMoreThanOneChild() throws Exception {
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "controlSchema": {
+                    "layout": [
+                      {
+                        "widget": "repeat",
+                        "children": [
+                          {"widget": "text", "stateKey": "a"},
+                          {"widget": "text", "stateKey": "b"}
+                        ]
+                      }
+                    ]
+                  },
+                  "dataSchema": {"type":"object"}
+                }
+                """);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.publishDefinition("repeat-shape", definition, "tester", "invalid")
+        );
+
+        assertTrue(ex.getMessage().contains("children must contain exactly one item for repeat widget"));
+    }
+
+    @Test
+    void publishDefinition_rejectsRepeatWithSectionChild() throws Exception {
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "controlSchema": {
+                    "layout": [
+                      {
+                        "widget": "repeat",
+                        "children": [
+                          {
+                            "widget": "section",
+                            "children": [{"widget": "text", "stateKey": "x"}]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "dataSchema": {"type":"object"}
+                }
+                """);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.publishDefinition("repeat-child-widget", definition, "tester", "invalid")
+        );
+
+        assertTrue(ex.getMessage().contains("must be a group or scalar control for repeat widget"));
     }
 
     private WorkflowDefinitionEntity buildEntity(String definitionKey, String definitionJson) throws Exception {

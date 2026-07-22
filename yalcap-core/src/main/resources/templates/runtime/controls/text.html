@@ -1,0 +1,10 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <input type="text"
+               th:attr="name=${control.stateKey},
+                        placeholder=${control.renderModel != null ? control.renderModel['placeholder'] : ''},
+                        pattern=${control.renderModel != null ? control.renderModel['pattern'] : ''},
+                        disabled=${!control.enabled}"
+               th:required="${control.required}" />
+    </th:block>
+</th:block>

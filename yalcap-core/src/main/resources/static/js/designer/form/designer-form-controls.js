@@ -35,6 +35,20 @@
             return widget === 'button';
         },
 
+        getControlDesignerHooks(widget) {
+            const key = String(widget || '').trim().toLowerCase();
+            if (!key) {
+                return null;
+            }
+
+            const registry = windowAny.designerControlHooks;
+            if (!registry || typeof registry !== 'object') {
+                return null;
+            }
+
+            return registry[key] || null;
+        },
+
         templatePattern: /{{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*}}/g,
 
         supportsDefaultValue(widget) {
@@ -285,6 +299,49 @@
             return widget === 'group';
         },
 
+        isStateKeyPathContainerWidget(widget) {
+            return widget === 'group' || widget === 'repeat';
+        },
+
+        composeStateKeyPath(parentPath, segment) {
+            const part = this.toIdentifier(segment || 'field');
+            if (!parentPath) {
+                return part;
+            }
+            return `${parentPath}.${part}`;
+        },
+
+        applyDerivedStateKeys(controls = this.controls, parentPath = '') {
+            if (!Array.isArray(controls)) {
+                return;
+            }
+
+            controls.forEach((control) => {
+                if (!control) {
+                    return;
+                }
+
+                const nameSeed = control.name || control.label || 'field';
+                control.name = this.toIdentifier(nameSeed);
+
+                const currentPath = this.composeStateKeyPath(parentPath, control.name);
+                control.stateKey = currentPath;
+
+                if (!Array.isArray(control.children) || control.children.length === 0) {
+                    return;
+                }
+
+                const childParentPath = this.isStateKeyPathContainerWidget(control.widget)
+                    ? currentPath
+                    : parentPath;
+                this.applyDerivedStateKeys(control.children, childParentPath);
+            });
+        },
+
+        recomputeDerivedStateKeys() {
+            this.applyDerivedStateKeys(this.controls, '');
+        },
+
         slugify(value) {
             return (value || '')
                 .toString()
@@ -399,7 +456,7 @@
                 return control;
             }
 
-            const normalized = { ...control };
+            let normalized = { ...control };
             this.ensureOptionsArray(normalized);
             if (!Array.isArray(normalized.options)) {
                 normalized.options = [];
@@ -469,18 +526,6 @@
                 }
             }
 
-            if (normalized.widget === 'autocomplete') {
-                normalized.autocompleteSourceType = (normalized.autocompleteSourceType || 'static').trim() || 'static';
-                normalized.autocompleteSourceUrl = (normalized.autocompleteSourceUrl || '').trim();
-                normalized.autocompleteLabelField = (normalized.autocompleteLabelField || 'label').trim() || 'label';
-                normalized.autocompleteValueField = (normalized.autocompleteValueField || 'value').trim() || 'value';
-                normalized.autocompleteSearchParam = (normalized.autocompleteSearchParam || 'q').trim() || 'q';
-
-                if (normalized.autocompleteSourceType === 'remote') {
-                    normalized.options = [];
-                }
-            }
-
             if (normalized.widget === 'date') {
                 normalized.type = 'string';
                 normalized.options = [];
@@ -518,6 +563,30 @@
             if (normalized.widget === 'number') {
                 normalized.type = 'number';
                 normalized.options = [];
+                const kind = String(normalized.numberKind || '').trim().toLowerCase();
+                normalized.numberKind = kind === 'integer' ? 'integer' : 'decimal';
+
+                const toNumberOrNull = (value) => {
+                    if (value === '' || value === null || value === undefined) {
+                        return null;
+                    }
+                    const parsed = Number(value);
+                    return Number.isFinite(parsed) ? parsed : null;
+                };
+
+                normalized.min = toNumberOrNull(normalized.min);
+                normalized.max = toNumberOrNull(normalized.max);
+                normalized.step = toNumberOrNull(normalized.step);
+
+                if (normalized.precision === '' || normalized.precision === null || normalized.precision === undefined) {
+                    normalized.precision = null;
+                } else {
+                    const parsedPrecision = Number(normalized.precision);
+                    normalized.precision = Number.isInteger(parsedPrecision) && parsedPrecision >= 0
+                        ? parsedPrecision
+                        : null;
+                }
+
                 if (normalized.defaultValue === '' || normalized.defaultValue === null || normalized.defaultValue === undefined) {
                     normalized.defaultValue = null;
                 } else {
@@ -654,44 +723,9 @@
                 normalized.repeatAllowReorder = normalized.repeatAllowReorder === true;
             }
 
-            if (normalized.widget === 'table') {
-                normalized.type = 'array';
-                normalized.placeholder = '';
-                normalized.options = [];
-                normalized.defaultValue = null;
-                normalized.tableColumns = Array.isArray(normalized.tableColumns) ? normalized.tableColumns : [];
-                if (normalized.tableColumns.length === 0) {
-                    normalized.tableColumns = [
-                        { key: 'column1', title: 'Column 1', type: 'string', required: false },
-                        { key: 'column2', title: 'Column 2', type: 'string', required: false }
-                    ];
-                }
-                normalized.tableColumns = normalized.tableColumns.map((col, idx) => ({
-                    key: this.toIdentifier(col.key || `column${idx + 1}`),
-                    title: (col.title || col.key || `Column ${idx + 1}`).trim(),
-                    type: (col.type || 'string').trim(),
-                    required: col.required === true
-                }));
-
-                normalized.tableMinItems = Number(normalized.tableMinItems) || 0;
-                if (normalized.tableMinItems < 0) {
-                    normalized.tableMinItems = 0;
-                }
-                normalized.tableMaxItems = Number(normalized.tableMaxItems) || 0;
-                if (normalized.tableMaxItems < 0) {
-                    normalized.tableMaxItems = 0;
-                }
-                normalized.tableAllowAdd = normalized.tableAllowAdd !== false;
-                normalized.tableAllowDelete = normalized.tableAllowDelete !== false;
-                normalized.tableAllowReorder = normalized.tableAllowReorder === true;
-
-                // Keep table editable but map to repeat semantics during schema generation.
-                normalized.repeatRenderer = normalized.repeatRenderer || 'table';
-                normalized.repeatMinItems = Number(normalized.tableMinItems) || 0;
-                normalized.repeatMaxItems = Number(normalized.tableMaxItems) || 0;
-                normalized.repeatAllowAdd = normalized.tableAllowAdd !== false;
-                normalized.repeatAllowDelete = normalized.tableAllowDelete !== false;
-                normalized.repeatAllowReorder = normalized.tableAllowReorder === true;
+            const widgetHooks = this.getControlDesignerHooks(normalized.widget);
+            if (widgetHooks && typeof widgetHooks.normalize === 'function') {
+                normalized = widgetHooks.normalize(normalized, this) || normalized;
             }
 
             if (normalized.widget === 'section') {
@@ -756,16 +790,9 @@
             const options = Array.isArray(normalized.options) ? normalized.options : [];
             const needsOptions = this.isOptionWidget(normalized.widget);
 
-            if (normalized.widget === 'autocomplete' && normalized.autocompleteSourceType === 'remote') {
-                if (!normalized.autocompleteSourceUrl) {
-                    errs.push('Autocomplete remote source requires a source URL.');
-                }
-                if (!normalized.autocompleteLabelField) {
-                    errs.push('Autocomplete remote source requires a label field.');
-                }
-                if (!normalized.autocompleteValueField) {
-                    errs.push('Autocomplete remote source requires a value field.');
-                }
+            const widgetHooks = this.getControlDesignerHooks(normalized.widget);
+            if (widgetHooks && typeof widgetHooks.validate === 'function') {
+                widgetHooks.validate(normalized, errs, this);
             }
 
             if (needsOptions && options.length === 0 && !(normalized.widget === 'autocomplete' && normalized.autocompleteSourceType === 'remote')) {
@@ -854,31 +881,70 @@
                 }
             }
 
-            if (normalized.widget === 'table') {
-                if (!normalized.name || !normalized.name.trim()) {
-                    errs.push('Table control requires a field name for array data binding.');
+            if (normalized.widget === 'number') {
+                const kind = String(normalized.numberKind || 'decimal').trim().toLowerCase();
+                if (kind !== 'integer' && kind !== 'decimal') {
+                    errs.push('Number kind must be integer or decimal.');
                 }
 
-                if (!Array.isArray(normalized.tableColumns) || normalized.tableColumns.length === 0) {
-                    errs.push('Table control requires at least one column.');
-                } else {
-                    const seen = new Set();
-                    normalized.tableColumns.forEach((col) => {
-                        if (!col.key || !this.isJsSafeIdentifier(col.key)) {
-                            errs.push('Each table column key must be a JS-safe identifier.');
-                        }
-                        if (!col.title || !col.title.trim()) {
-                            errs.push('Each table column requires a title.');
-                        }
-                        if (seen.has(col.key)) {
-                            errs.push('Table column keys must be unique.');
-                        }
-                        seen.add(col.key);
-                    });
+                const hasMin = normalized.min !== null && normalized.min !== undefined;
+                const hasMax = normalized.max !== null && normalized.max !== undefined;
+                const hasStep = normalized.step !== null && normalized.step !== undefined;
+                const hasPrecision = normalized.precision !== null && normalized.precision !== undefined;
+
+                if (hasMin && !Number.isFinite(Number(normalized.min))) {
+                    errs.push('Number min must be numeric when provided.');
+                }
+                if (hasMax && !Number.isFinite(Number(normalized.max))) {
+                    errs.push('Number max must be numeric when provided.');
+                }
+                if (hasStep && !Number.isFinite(Number(normalized.step))) {
+                    errs.push('Number step must be numeric when provided.');
+                }
+                if (hasPrecision && (!Number.isInteger(Number(normalized.precision)) || Number(normalized.precision) < 0)) {
+                    errs.push('Number precision must be an integer greater than or equal to 0 when provided.');
                 }
 
-                if (normalized.tableMaxItems > 0 && normalized.tableMaxItems < normalized.tableMinItems) {
-                    errs.push('Table max rows must be greater than or equal to min rows.');
+                if (hasMin && hasMax && Number(normalized.max) < Number(normalized.min)) {
+                    errs.push('Number max must be greater than or equal to min.');
+                }
+
+                if (hasStep && Number(normalized.step) <= 0) {
+                    errs.push('Number step must be greater than 0 when provided.');
+                }
+
+                const isIntegerLike = (value) => {
+                    if (value === null || value === undefined) {
+                        return true;
+                    }
+                    return Number.isInteger(Number(value));
+                };
+
+                if (kind === 'integer') {
+                    if (!isIntegerLike(normalized.defaultValue)) {
+                        errs.push('Integer number kind requires an integer default value.');
+                    }
+                    if (!isIntegerLike(normalized.min)) {
+                        errs.push('Integer number kind requires integer min.');
+                    }
+                    if (!isIntegerLike(normalized.max)) {
+                        errs.push('Integer number kind requires integer max.');
+                    }
+                    if (!isIntegerLike(normalized.step)) {
+                        errs.push('Integer number kind requires integer step.');
+                    }
+                    if (hasPrecision && Number(normalized.precision) !== 0) {
+                        errs.push('Integer number kind requires precision 0 when provided.');
+                    }
+                }
+
+                if (kind === 'decimal' && hasPrecision && hasStep) {
+                    const stepText = String(normalized.step);
+                    const decimalPart = stepText.includes('.') ? stepText.split('.')[1] : '';
+                    const stepScale = decimalPart.length;
+                    if (stepScale > Number(normalized.precision)) {
+                        errs.push('Number step scale must be less than or equal to precision.');
+                    }
                 }
             }
 

@@ -1,5 +1,8 @@
 package com.yalcap.web;
 
+import com.yalcap.definition.form.control.ControlTypeClientAssets;
+import com.yalcap.definition.form.control.ControlTypeDescriptor;
+import com.yalcap.definition.form.control.ControlTypeRegistry;
 import com.yalcap.definition.form.FormDefinitionEntity;
 import com.yalcap.definition.form.FormDefinitionService;
 import com.yalcap.definition.workflow.WorkflowDefinitionEntity;
@@ -18,8 +21,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.UUID;
 
 @Controller
@@ -28,13 +34,16 @@ public class DesignerController {
 
     private final FormDefinitionService formDefinitionService;
     private final WorkflowDefinitionService definitionService;
+    private final ControlTypeRegistry controlTypeRegistry;
     private final ObjectMapper objectMapper;
 
     public DesignerController(FormDefinitionService formDefinitionService,
                               WorkflowDefinitionService definitionService,
+                              ControlTypeRegistry controlTypeRegistry,
                               ObjectMapper objectMapper) {
         this.formDefinitionService = formDefinitionService;
         this.definitionService = definitionService;
+        this.controlTypeRegistry = controlTypeRegistry;
         this.objectMapper = objectMapper;
     }
 
@@ -114,6 +123,7 @@ public class DesignerController {
         String key = definitionKey != null ? definitionKey : "example-review";
         putDefinitionKey(model, key);
         model.addAttribute("tenantId", tenantId);
+        addDesignerAssets(model);
         formDefinitionService.getActiveForm(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
         return "designer/form";
     }
@@ -125,6 +135,7 @@ public class DesignerController {
         String key = definitionKey != null ? definitionKey : "example-review";
         putDefinitionKey(model, key);
         model.addAttribute("tenantId", tenantId);
+        addDesignerAssets(model);
         model.addAttribute("workflowPublishAction", tenantId != null
             ? "/t/" + tenantId + "/designer/workflow/publish"
             : "/designer/workflow/publish");
@@ -168,6 +179,41 @@ public class DesignerController {
 
     private void putDefinitionKey(Model model, String definitionKey) {
         model.addAttribute("definitionKey", definitionKey);
+    }
+
+    private void addDesignerAssets(Model model) {
+        Set<String> designerJs = new LinkedHashSet<>();
+        Set<String> designerCss = new LinkedHashSet<>();
+
+        for (ControlTypeDescriptor descriptor : controlTypeRegistry.descriptors()) {
+            if (descriptor == null) {
+                continue;
+            }
+
+            ControlTypeClientAssets assets = descriptor.clientAssets();
+            if (assets == null) {
+                continue;
+            }
+
+            addAssets(designerJs, assets.designerJs());
+            addAssets(designerCss, assets.designerCss());
+        }
+
+        model.addAttribute("designerJsAssets", new ArrayList<>(designerJs));
+        model.addAttribute("designerCssAssets", new ArrayList<>(designerCss));
+    }
+
+    private void addAssets(Set<String> target, List<String> assets) {
+        if (assets == null) {
+            return;
+        }
+
+        for (String asset : assets) {
+            String value = asset == null ? "" : asset.trim();
+            if (!value.isEmpty()) {
+                target.add(value);
+            }
+        }
     }
 
     public static class PublishDefinitionForm {

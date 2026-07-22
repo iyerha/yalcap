@@ -1,23 +1,34 @@
 package com.yalcap.definition.form;
 
+import com.yalcap.definition.form.control.ControlType;
+import com.yalcap.definition.form.control.ControlTextDirection;
+import com.yalcap.definition.form.control.ControlTypeRegistry;
+import com.yalcap.definition.form.control.ControlTypeValidationContext;
+import com.yalcap.definition.form.control.ControlTypeValidationErrors;
 import com.yalcap.persistence.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.i18n.LocaleContextHolder;
 import tools.jackson.databind.JsonNode;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class FormDefinitionService {
 
-    private final FormDefinitionRepository repository;
+    private static final Set<String> RTL_LANGUAGES = Set.of("ar", "fa", "he", "ur");
 
-    public FormDefinitionService(FormDefinitionRepository repository) {
+    private final FormDefinitionRepository repository;
+    private final ControlTypeRegistry controlTypeRegistry;
+
+    public FormDefinitionService(FormDefinitionRepository repository,
+                                 ControlTypeRegistry controlTypeRegistry) {
         this.repository = repository;
+        this.controlTypeRegistry = controlTypeRegistry;
     }
 
     public Optional<FormDefinitionEntity> getActiveForm(String formKey) {
@@ -112,27 +123,6 @@ public class FormDefinitionService {
                 validateRepeatControl(control, contextPath + "[" + i + "]");
             }
 
-            if ("autocomplete".equals(widget)) {
-                String sourceType = control.path("autocompleteSourceType").asString("static").trim();
-                JsonNode options = control.path("options");
-                if ("remote".equals(sourceType)) {
-                    String sourceUrl = control.path("autocompleteSourceUrl").asString("").trim();
-                    if (sourceUrl.isEmpty()) {
-                        throw new IllegalArgumentException(contextPath + "[" + i + "].autocompleteSourceUrl is required for remote autocomplete widget");
-                    }
-                } else if (!options.isArray() || options.size() == 0) {
-                    throw new IllegalArgumentException(contextPath + "[" + i + "].options is required for autocomplete widget");
-                }
-            }
-
-            if ("date".equals(widget)) {
-                validateDateBounds(control, contextPath + "[" + i + "]", "minDate", "maxDate");
-            }
-
-            if ("datetime".equals(widget)) {
-                validateDateTimeBounds(control, contextPath + "[" + i + "]", "minDateTime", "maxDateTime");
-            }
-
             if ("table".equals(widget)) {
                 JsonNode columns = control.path("columns");
                 JsonNode legacyColumns = control.path("tableColumns");
@@ -145,11 +135,47 @@ public class FormDefinitionService {
                 validateMinMaxBounds(control, contextPath + "[" + i + "]", "tableMinItems", "tableMaxItems");
             }
 
+            validateControlTypeDefinition(control, contextPath + "[" + i + "]");
+
             JsonNode children = control.path("children");
             if (children.isArray()) {
                 validateLayoutControlsInLayout(children, contextPath + "[" + i + "].children");
             }
         }
+    }
+
+    private void validateControlTypeDefinition(JsonNode control, String controlPath) {
+        String widget = control.path("widget").asString("").trim();
+        if (widget.isEmpty()) {
+            return;
+        }
+
+        ControlType type = controlTypeRegistry.find(widget).orElse(null);
+        if (type == null) {
+            // Keep backward compatibility while core controls are still migrating.
+            return;
+        }
+
+        Locale locale = LocaleContextHolder.getLocale();
+        ControlTextDirection direction = inferDirection(locale);
+        ControlTypeValidationErrors errors = new ControlTypeValidationErrors();
+        type.validate(new ControlTypeValidationContext(control, controlPath, errors, locale, direction));
+        if (errors.hasErrors()) {
+            throw new IllegalArgumentException(String.join("; ", errors.all()));
+        }
+    }
+
+    private ControlTextDirection inferDirection(Locale locale) {
+        if (locale == null) {
+            return ControlTextDirection.LTR;
+        }
+        String language = locale.getLanguage();
+        if (language == null) {
+            return ControlTextDirection.LTR;
+        }
+        return RTL_LANGUAGES.contains(language.toLowerCase(Locale.ROOT))
+                ? ControlTextDirection.RTL
+                : ControlTextDirection.LTR;
     }
 
     private void validateRepeatControl(JsonNode control, String contextPath) {
@@ -163,6 +189,18 @@ public class FormDefinitionService {
 
         if (!hasChildren && !hasColumns) {
             throw new IllegalArgumentException(contextPath + " requires children or columns for repeat widget");
+        }
+
+        if (hasChildren) {
+            if (children.size() != 1) {
+                throw new IllegalArgumentException(contextPath + ".children must contain exactly one item for repeat widget");
+            }
+
+            JsonNode onlyChild = children.get(0);
+            String childWidget = onlyChild == null ? "" : onlyChild.path("widget").asString("").trim().toLowerCase();
+            if ("repeat".equals(childWidget) || "section".equals(childWidget)) {
+                throw new IllegalArgumentException(contextPath + ".children[0] must be a group or scalar control for repeat widget");
+            }
         }
 
         validateMinMaxBounds(control, contextPath, "minItems", "maxItems");
@@ -195,41 +233,4 @@ public class FormDefinitionService {
         return value;
     }
 
-    private void validateDateBounds(JsonNode control, String contextPath, String minKey, String maxKey) {
-        LocalDate min = parseLocalDate(control.get(minKey), contextPath + "." + minKey);
-        LocalDate max = parseLocalDate(control.get(maxKey), contextPath + "." + maxKey);
-        if (min != null && max != null && max.isBefore(min)) {
-            throw new IllegalArgumentException(contextPath + "." + maxKey + " must be greater than or equal to " + minKey);
-        }
-    }
-
-    private void validateDateTimeBounds(JsonNode control, String contextPath, String minKey, String maxKey) {
-        LocalDateTime min = parseLocalDateTime(control.get(minKey), contextPath + "." + minKey);
-        LocalDateTime max = parseLocalDateTime(control.get(maxKey), contextPath + "." + maxKey);
-        if (min != null && max != null && max.isBefore(min)) {
-            throw new IllegalArgumentException(contextPath + "." + maxKey + " must be greater than or equal to " + minKey);
-        }
-    }
-
-    private LocalDate parseLocalDate(JsonNode node, String contextPath) {
-        if (node == null || node.isNull() || !node.isString() || node.asString().trim().isEmpty()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(node.asString().trim());
-        } catch (RuntimeException ex) {
-            throw new IllegalArgumentException(contextPath + " must be an ISO date (YYYY-MM-DD)");
-        }
-    }
-
-    private LocalDateTime parseLocalDateTime(JsonNode node, String contextPath) {
-        if (node == null || node.isNull() || !node.isString() || node.asString().trim().isEmpty()) {
-            return null;
-        }
-        try {
-            return LocalDateTime.parse(node.asString().trim());
-        } catch (RuntimeException ex) {
-            throw new IllegalArgumentException(contextPath + " must be an ISO local datetime");
-        }
-    }
 }

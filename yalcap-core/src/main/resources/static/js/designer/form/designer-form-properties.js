@@ -4,7 +4,7 @@
 
     const propertiesApi = /** @type {Record<string, any>} */ ({
         toggleStateKeyEdit() {
-            this.stateKeyEditEnabled = !this.stateKeyEditEnabled;
+            this.stateKeyEditEnabled = false;
         },
 
         onLabelChanged() {
@@ -186,6 +186,13 @@
                 tableColumns: [...(this.selectedControl.tableColumns || [])],
                 children: [...(this.selectedControl.children || [])]
             };
+
+            this.recomputeDerivedStateKeys();
+            const refreshed = this.findControlById(this.selectedControlId);
+            if (refreshed) {
+                this.selectedControl = this.normalizeControl(refreshed.control);
+            }
+
             this.validateSelected();
         },
 

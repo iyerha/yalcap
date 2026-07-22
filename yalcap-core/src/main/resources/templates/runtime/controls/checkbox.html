@@ -1,0 +1,11 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <div class="runtime-checkbox-group">
+            <label th:each="opt : ${control.renderModel != null ? control.renderModel['options'] : null}" class="runtime-checkbox-option">
+                <input type="checkbox"
+                       th:attr="name=${control.stateKey + '[]'}, value=${opt['value']}, disabled=${!control.enabled}" />
+                <span th:text="${opt['label']}"></span>
+            </label>
+        </div>
+    </th:block>
+</th:block>

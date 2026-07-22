@@ -1,0 +1,10 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <div class="runtime-group-meta"
+             th:attr="data-group-name=${control.renderModel != null ? control.renderModel['name'] : ''}">
+            <p class="subtle"
+               th:if="${control.renderModel != null and control.renderModel['description'] != null and control.renderModel['description'] != ''}"
+               th:text="${control.renderModel['description']}"></p>
+        </div>
+    </th:block>
+</th:block>

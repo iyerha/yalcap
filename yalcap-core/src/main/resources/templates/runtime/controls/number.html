@@ -1,0 +1,12 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <input type="number"
+               th:attr="name=${control.stateKey},
+                        placeholder=${control.renderModel != null ? control.renderModel['placeholder'] : ''},
+                        min=${control.renderModel != null ? control.renderModel['min'] : ''},
+                        max=${control.renderModel != null ? control.renderModel['max'] : ''},
+                        step=${control.renderModel != null ? control.renderModel['step'] : ''},
+                        disabled=${!control.enabled}"
+               th:required="${control.required}" />
+    </th:block>
+</th:block>

@@ -1,0 +1,68 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <th:block th:with="sourceType=${control.renderModel != null ? control.renderModel['sourceType'] : 'static'},
+                           sourceUrl=${control.renderModel != null ? control.renderModel['sourceUrl'] : ''},
+                           labelField=${control.renderModel != null ? control.renderModel['labelField'] : 'label'},
+                           valueField=${control.renderModel != null ? control.renderModel['valueField'] : 'value'},
+                           searchParam=${control.renderModel != null ? control.renderModel['searchParam'] : 'q'},
+                              minChars=${control.renderModel != null ? control.renderModel['minChars'] : 2},
+                              maxResults=${control.renderModel != null ? control.renderModel['maxResults'] : 25},
+                              allowFreeText=${control.renderModel != null and control.renderModel['allowFreeText'] == true},
+                           options=${control.renderModel != null ? control.renderModel['options'] : null},
+                              listId=${control.stateKey + '-options'},
+                                  listboxId=${control.stateKey + '-listbox'},
+                                  valueInputId=${control.stateKey + '-value'}">
+                         <div class="runtime-autocomplete" th:attr="data-autocomplete-host-for=${valueInputId}">
+                     <input type="hidden"
+                         th:attr="id=${valueInputId},
+                            name=${control.stateKey},
+                            disabled=${!control.enabled}" />
+
+            <input type="text"
+                         th:attr="name=${control.stateKey + '__display'},
+                            placeholder=${control.renderModel != null ? control.renderModel['placeholder'] : ''},
+                            autocomplete='off',
+                                role='combobox',
+                                aria-autocomplete='list',
+                                aria-haspopup='listbox',
+                                aria-expanded='false',
+                                aria-controls=${listboxId},
+                            data-autocomplete-source-type=${sourceType},
+                            data-autocomplete-source-url=${sourceType == 'remote' ? sourceUrl : null},
+                            data-autocomplete-label-field=${sourceType == 'remote' ? labelField : null},
+                            data-autocomplete-value-field=${sourceType == 'remote' ? valueField : null},
+                            data-autocomplete-search-param=${sourceType == 'remote' ? searchParam : null},
+                            data-autocomplete-list-id=${listId},
+                                data-autocomplete-listbox-id=${listboxId},
+                            data-autocomplete-value-id=${valueInputId},
+                            data-autocomplete-min-chars=${minChars},
+                            data-autocomplete-max-results=${maxResults},
+                            data-autocomplete-allow-free-text=${allowFreeText ? 'true' : 'false'},
+                            disabled=${!control.enabled}"
+                   th:required="${control.required}" />
+
+                         <span class="runtime-autocomplete-spinner hidden"
+                            aria-hidden="true"
+                            th:attr="data-autocomplete-spinner-for=${valueInputId}"></span>
+
+                         <div class="runtime-autocomplete-menu hidden"
+                           th:attr="data-autocomplete-menu-for=${valueInputId}">
+                          <ul class="runtime-autocomplete-listbox"
+                              role="listbox"
+                              th:attr="id=${listboxId}"></ul>
+                         </div>
+
+            <datalist th:if="${sourceType == 'remote' or (options != null and !#lists.isEmpty(options))}"
+                      th:id="${listId}">
+                <option th:each="opt : ${options}"
+                    th:attr="value=${opt['label']}, data-submit-value=${opt['value']}"
+                        th:text="${opt['label']}"></option>
+            </datalist>
+
+            <small class="runtime-autocomplete-status"
+                   aria-live="polite"
+                   th:attr="data-autocomplete-status-for=${valueInputId}"></small>
+                         </div>
+        </th:block>
+    </th:block>
+</th:block>

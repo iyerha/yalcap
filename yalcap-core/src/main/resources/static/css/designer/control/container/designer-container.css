@@ -1,0 +1,73 @@
+.preview-container {
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: color-mix(in oklab, var(--surface) 90%, var(--bg));
+    display: grid;
+    gap: 4px;
+}
+
+.preview-section {
+    border-left: 4px solid color-mix(in oklab, var(--accent) 70%, white);
+}
+
+.preview-group {
+    border-left: 4px solid color-mix(in oklab, var(--text) 55%, white);
+}
+
+.nested-dropzone {
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+}
+
+.nested-dropzone.nested-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-content: start;
+}
+
+.nested-dropzone.nested-grid > .subtle {
+    grid-column: 1 / -1;
+}
+
+.nested-runtime-control {
+    border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--surface) 96%, var(--bg));
+    padding: 8px 8px 22px;
+    display: grid;
+    gap: 6px;
+    cursor: default;
+    position: relative;
+}
+
+.nested-runtime-control > :not(.resize-row) {
+    position: relative;
+    z-index: 1;
+}
+
+.nested-runtime-control.active {
+    border-style: solid;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.nested-runtime-control .resize-row {
+    right: 8px;
+    bottom: 6px;
+}
+
+.nested-runtime-control.active .resize-row {
+    opacity: 1;
+}
+
+.nested-runtime-control .preview-label {
+    margin-bottom: 2px;
+}
+
+.nested-runtime-control .preview-image-placeholder {
+    min-height: 78px;
+    padding: 8px;
+}

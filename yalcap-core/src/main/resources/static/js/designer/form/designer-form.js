@@ -5,6 +5,7 @@ function formDesigner() {
     const schemaApi = windowAny.formDesignerSchema || {};
     const propertiesApi = windowAny.formDesignerProperties || {};
     const interactionsApi = windowAny.formDesignerInteractions || {};
+    const rulesApi = windowAny.formDesignerRules || {};
     const definitionKeyEl = /** @type {HTMLInputElement | null} */ (document.getElementById('definitionKey'));
 
     return {
@@ -14,6 +15,7 @@ function formDesigner() {
         paletteCollapsed: false,
         propertiesCollapsed: false,
         selectedTheme: 'default',
+        previewViewport: 'desktop',
         customTheme: {
             accent: '#2563eb',
             bg: '#f7f8fa',
@@ -67,11 +69,20 @@ function formDesigner() {
         validationErrors: [],
         definitionJson: '',
         rules: [],
+        decisionTableScope: 'form',
+        decisionTableDescription: '',
+        decisionInputColumns: [],
+        decisionActionColumns: [],
+        nextDecisionColumnSeq: 1,
+        decisionTables: [],
+        activeDecisionTableId: null,
+        nextDecisionTableSeq: 1,
 
         ...controlsApi,
         ...schemaApi,
         ...propertiesApi,
         ...interactionsApi,
+        ...rulesApi,
 
         applyTheme() {
             const host = this.$root;
@@ -97,6 +108,40 @@ function formDesigner() {
             this.activePage = String(page || 'builder');
         },
 
+        setPreviewViewport(mode) {
+            const next = String(mode || '').toLowerCase();
+            const allowed = new Set(['desktop', 'tablet', 'phone']);
+            this.previewViewport = allowed.has(next) ? next : 'desktop';
+        },
+
+        viewportPreviewHint() {
+            if (this.previewViewport === 'tablet') {
+                return 'Preview mode: tablet (approx 834px wide canvas).';
+            }
+            if (this.previewViewport === 'phone') {
+                return 'Preview mode: phone (approx 390px wide canvas).';
+            }
+            return 'Preview mode: desktop (full canvas width).';
+        },
+
+        previewColSpan(control) {
+            const raw = Number(control && control.colSpan);
+            const baseSpan = Number.isFinite(raw)
+                ? Math.max(1, Math.min(12, Math.round(raw)))
+                : 12;
+
+            if (this.previewViewport === 'phone') {
+                return 4;
+            }
+
+            if (this.previewViewport === 'tablet') {
+                const mapped = Math.round((baseSpan / 12) * 8);
+                return Math.max(1, Math.min(8, mapped));
+            }
+
+            return baseSpan;
+        },
+
         toggleMenuCollapsed() {
             this.menuCollapsed = !this.menuCollapsed;
         },
@@ -107,6 +152,95 @@ function formDesigner() {
 
         togglePropertiesCollapsed() {
             this.propertiesCollapsed = !this.propertiesCollapsed;
+        },
+
+        syncCurrentDecisionTable() {
+            if (!this.activeDecisionTableId) {
+                return;
+            }
+            const table = this.decisionTables.find((item) => item.id === this.activeDecisionTableId);
+            if (!table) {
+                return;
+            }
+            table.scope = String(this.decisionTableScope || 'form').trim() || 'form';
+            table.description = String(this.decisionTableDescription || '').trim();
+            table.rules = this.rules;
+            table.decisionInputColumns = this.decisionInputColumns;
+            table.decisionActionColumns = this.decisionActionColumns;
+        },
+
+        newDecisionTable(name = '') {
+            const next = this.nextDecisionTableSeq;
+            this.nextDecisionTableSeq += 1;
+            return {
+                id: `table-${next}`,
+                name: String(name || `Table ${next}`).trim() || `Table ${next}`,
+                scope: 'form',
+                description: '',
+                rules: [],
+                decisionInputColumns: [],
+                decisionActionColumns: []
+            };
+        },
+
+        ensureDecisionTables() {
+            if (!Array.isArray(this.decisionTables)) {
+                this.decisionTables = [];
+            }
+            if (this.decisionTables.length === 0) {
+                const table = this.newDecisionTable('Table 1');
+                table.scope = String(this.decisionTableScope || 'form').trim() || 'form';
+                table.rules = Array.isArray(this.rules) ? this.rules : [];
+                table.decisionInputColumns = Array.isArray(this.decisionInputColumns) ? this.decisionInputColumns : [];
+                table.decisionActionColumns = Array.isArray(this.decisionActionColumns) ? this.decisionActionColumns : [];
+                this.decisionTables.push(table);
+                this.activeDecisionTableId = table.id;
+            }
+
+            if (!this.activeDecisionTableId || !this.decisionTables.some((item) => item.id === this.activeDecisionTableId)) {
+                this.activeDecisionTableId = this.decisionTables[0].id;
+            }
+            this.selectDecisionTable(this.activeDecisionTableId);
+        },
+
+        selectDecisionTable(tableId) {
+            this.syncCurrentDecisionTable();
+            const table = this.decisionTables.find((item) => item.id === tableId);
+            if (!table) {
+                return;
+            }
+            this.activeDecisionTableId = table.id;
+            this.rules = Array.isArray(table.rules) ? table.rules : [];
+            this.decisionInputColumns = Array.isArray(table.decisionInputColumns) ? table.decisionInputColumns : [];
+            this.decisionActionColumns = Array.isArray(table.decisionActionColumns) ? table.decisionActionColumns : [];
+            this.decisionTableScope = String(table.scope || 'form').trim() || 'form';
+            this.decisionTableDescription = String(table.description || '').trim();
+            this.ensureDecisionTableSchema();
+            this.syncCurrentDecisionTable();
+        },
+
+        addDecisionTable() {
+            this.syncCurrentDecisionTable();
+            const table = this.newDecisionTable();
+            this.decisionTables.push(table);
+            this.selectDecisionTable(table.id);
+        },
+
+        removeDecisionTable(tableId) {
+            if (!tableId || !Array.isArray(this.decisionTables) || this.decisionTables.length <= 1) {
+                return;
+            }
+            const idx = this.decisionTables.findIndex((item) => item.id === tableId);
+            if (idx < 0) {
+                return;
+            }
+            this.syncCurrentDecisionTable();
+            this.decisionTables.splice(idx, 1);
+            const nextIndex = Math.max(0, idx - 1);
+            const next = this.decisionTables[nextIndex];
+            if (next) {
+                this.selectDecisionTable(next.id);
+            }
         },
 
         paletteIconSvg(widget) {
@@ -149,400 +283,12 @@ function formDesigner() {
             const found = this.findControlById(id);
             if (found) {
                 found.list.splice(found.index, 1);
+                this.recomputeDerivedStateKeys();
             }
             if (this.selectedControlId === id) {
                 this.selectedControlId = null;
                 this.selectedControl = null;
             }
-        },
-
-        addRule() {
-            const nextIndex = this.rules.length + 1;
-            this.rules.push({
-                id: `rule-${nextIndex}`,
-                scope: 'form',
-                whenFact: '',
-                whenOp: 'eq',
-                whenValue: '',
-                whenValuesText: '',
-                whenJsonLogic: '',
-                conditionMatchMode: 'all',
-                conditions: [this.newConditionRow()],
-                actions: [
-                    { target: '', intent: 'visible:true' }
-                ]
-            });
-        },
-
-        newConditionRow() {
-            return { field: '', op: 'eq', value: '', valuesText: '' };
-        },
-
-        addRuleCondition(rule) {
-            if (!rule || !Array.isArray(rule.conditions)) {
-                return;
-            }
-            rule.conditions.push(this.newConditionRow());
-        },
-
-        removeRuleCondition(rule, conditionIndex) {
-            if (!rule || !Array.isArray(rule.conditions) || rule.conditions.length <= 1) {
-                return;
-            }
-            if (conditionIndex < 0 || conditionIndex >= rule.conditions.length) {
-                return;
-            }
-            rule.conditions.splice(conditionIndex, 1);
-        },
-
-        moveRuleUp(index) {
-            if (index <= 0 || index >= this.rules.length) {
-                return;
-            }
-            const prev = this.rules[index - 1];
-            this.rules[index - 1] = this.rules[index];
-            this.rules[index] = prev;
-        },
-
-        moveRuleDown(index) {
-            if (index < 0 || index >= this.rules.length - 1) {
-                return;
-            }
-            const next = this.rules[index + 1];
-            this.rules[index + 1] = this.rules[index];
-            this.rules[index] = next;
-        },
-
-        removeRule(index) {
-            if (index < 0 || index >= this.rules.length) {
-                return;
-            }
-            this.rules.splice(index, 1);
-        },
-
-        addRuleAction(rule) {
-            if (!rule || !Array.isArray(rule.actions)) {
-                return;
-            }
-            rule.actions.push({ target: '', intent: 'visible:true' });
-        },
-
-        removeRuleAction(rule, actionIndex) {
-            if (!rule || !Array.isArray(rule.actions) || rule.actions.length <= 1) {
-                return;
-            }
-            if (actionIndex < 0 || actionIndex >= rule.actions.length) {
-                return;
-            }
-            rule.actions.splice(actionIndex, 1);
-        },
-
-        availableStateKeyOptions() {
-            const options = [];
-            const seen = new Set();
-            const walk = (controls) => {
-                if (!Array.isArray(controls)) {
-                    return;
-                }
-                controls.forEach((control) => {
-                    if (!control) {
-                        return;
-                    }
-                    const key = String(control.stateKey || control.name || '').trim();
-                    if (key && !seen.has(key)) {
-                        seen.add(key);
-                        options.push({
-                            key,
-                            label: String(control.label || control.name || control.stateKey || key).trim()
-                        });
-                    }
-                    if (Array.isArray(control.children) && control.children.length > 0) {
-                        walk(control.children);
-                    }
-                });
-            };
-            walk(this.controls);
-            options.sort((a, b) => a.key.localeCompare(b.key));
-            return options;
-        },
-
-        availableStateKeys() {
-            return this.availableStateKeyOptions().map((item) => item.key);
-        },
-
-        availableConditionFieldOptions() {
-            const builtIns = [
-                { key: 'workflow.stepId', label: 'Workflow Step' },
-                { key: 'workflow.definitionKey', label: 'Workflow Definition' },
-                { key: 'user.id', label: 'User Id' },
-                { key: 'user.groups', label: 'User Groups' },
-                { key: 'tenant.id', label: 'Tenant Id' }
-            ];
-
-            const dataFields = this.availableStateKeyOptions().map((item) => ({
-                key: `data.${item.key}`,
-                label: item.label
-            }));
-
-            return [...builtIns, ...dataFields];
-        },
-
-        hasSimpleConditionInputs(condition) {
-            if (!condition) {
-                return false;
-            }
-            return String(condition.field || '').trim() !== ''
-                || String(condition.value || '').trim() !== ''
-                || String(condition.valuesText || '').trim() !== '';
-        },
-
-        isKnownConditionField(fieldPath) {
-            const field = String(fieldPath || '').trim();
-            if (!field) {
-                return false;
-            }
-            const known = new Set(this.availableConditionFieldOptions().map((item) => item.key));
-            if (known.has(field)) {
-                return true;
-            }
-            if (field.startsWith('data.') || field.startsWith('workflow.') || field.startsWith('user.') || field.startsWith('tenant.')) {
-                return true;
-            }
-            return false;
-        },
-
-        conditionFieldError(condition) {
-            if (!condition) {
-                return '';
-            }
-            return this.validateConditionField(condition);
-        },
-
-        validateConditionField(condition) {
-            const field = String(condition?.field || '').trim();
-            if (!field) {
-                return 'Field is required for simple conditions.';
-            }
-            if (!this.isKnownConditionField(field)) {
-                return 'Unknown field. Use picker or one of: data.*, workflow.*, user.*, tenant.*';
-            }
-            return '';
-        },
-
-        conditionValueError(condition) {
-            if (!condition) {
-                return '';
-            }
-            return this.validateConditionValue(condition);
-        },
-
-        validateConditionValue(condition) {
-            const op = String(condition?.op || 'eq').trim();
-            if (op === 'exists') {
-                return '';
-            }
-            if (op === 'in' || op === 'notIn') {
-                if (String(condition?.valuesText || '').trim() === '') {
-                    return 'Value is required for list operators.';
-                }
-                return '';
-            }
-            if (String(condition?.value || '').trim() === '') {
-                return 'Value is required for this operator.';
-            }
-            return '';
-        },
-
-        normalizeBoolean(value) {
-            if (value === true || value === false) {
-                return value;
-            }
-            const text = String(value ?? '').trim().toLowerCase();
-            return text === 'true' || text === '1' || text === 'yes';
-        },
-
-        actionValueMeaning(action) {
-            const effect = String(action?.effect || '').trim();
-            const value = this.normalizeBoolean(action?.value);
-            return `Set ${effect || 'effect'} to ${value ? 'true' : 'false'}`;
-        },
-
-        actionIntentMeaning(action) {
-            const intent = String(action?.intent || 'visible:true').trim();
-            const phrases = {
-                'visible:true': 'Set to be visible',
-                'visible:false': 'Set to be hidden',
-                'readable:true': 'Set to be readable',
-                'readable:false': 'Set to be unreadable',
-                'writable:true': 'Set to be editable',
-                'writable:false': 'Set to be read only',
-                'enabled:true': 'Set to be enabled',
-                'enabled:false': 'Set to be disabled',
-                'required:true': 'Set to be required',
-                'required:false': 'Set to be optional'
-            };
-            return phrases[intent] || 'Set action';
-        },
-
-        parseActionIntent(intent) {
-            const text = String(intent || '').trim();
-            const [effect, rawValue] = text.split(':');
-            const normalizedEffect = String(effect || '').trim();
-            const normalizedValue = String(rawValue || 'true').trim().toLowerCase() === 'false' ? false : true;
-            if (!normalizedEffect) {
-                return { effect: 'visible', value: true };
-            }
-            return { effect: normalizedEffect, value: normalizedValue };
-        },
-
-        parseRuleLiteral(raw) {
-            const text = String(raw || '').trim();
-            if (text === '') {
-                return '';
-            }
-            if (text === 'true') {
-                return true;
-            }
-            if (text === 'false') {
-                return false;
-            }
-            if (text === 'null') {
-                return null;
-            }
-            const asNumber = Number(text);
-            if (!Number.isNaN(asNumber) && text !== '') {
-                return asNumber;
-            }
-            return text;
-        },
-
-        buildJsonLogicFromSimpleCondition(condition) {
-            const whenFact = String(condition?.field || '').trim();
-            const whenOp = String(condition?.op || '').trim();
-            if (!whenFact || !whenOp) {
-                return null;
-            }
-
-            const varRef = { var: whenFact };
-            if (whenOp === 'exists') {
-                return { '!': [{ '==': [varRef, null] }] };
-            }
-
-            if (whenOp === 'in' || whenOp === 'notIn') {
-                const values = String(condition?.valuesText || '')
-                    .split(',')
-                    .map((v) => this.parseRuleLiteral(v))
-                    .filter((v) => v !== '');
-                if (values.length === 0) {
-                    return null;
-                }
-
-                if (values.length === 1) {
-                    const inExpr = { in: [values[0], varRef] };
-                    return whenOp === 'notIn' ? { '!': [inExpr] } : inExpr;
-                }
-
-                const listExpr = { in: [varRef, values] };
-                return whenOp === 'notIn' ? { '!': [listExpr] } : listExpr;
-            }
-
-            const value = this.parseRuleLiteral(condition?.value);
-            const operators = {
-                eq: '==',
-                ne: '!=',
-                gt: '>',
-                gte: '>=',
-                lt: '<',
-                lte: '<=',
-                matches: 'matches'
-            };
-            const jsonOp = operators[whenOp] || '==';
-            return { [jsonOp]: [varRef, value] };
-        },
-
-        parseJsonLogicText(raw) {
-            const text = String(raw || '').trim();
-            if (!text) {
-                return null;
-            }
-
-            try {
-                const parsed = JSON.parse(text);
-                if (windowAny.jsonLogic && typeof windowAny.jsonLogic.apply === 'function') {
-                    windowAny.jsonLogic.apply(parsed, {});
-                }
-                return parsed;
-            } catch (err) {
-                throw new Error(`Invalid JSON Logic: ${err instanceof Error ? err.message : String(err)}`);
-            }
-        },
-
-        normalizedRulesPayload() {
-            const out = [];
-            this.rules.forEach((rule, index) => {
-                const scope = String(rule.scope || '').trim();
-                if (!scope) {
-                    return;
-                }
-
-                const actions = Array.isArray(rule.actions)
-                    ? rule.actions
-                    : [{
-                        target: rule.target,
-                        intent: rule.intent,
-                        effect: rule.effect,
-                        value: rule.value
-                    }];
-
-                const normalizedActions = actions
-                    .map((action) => ({
-                        target: String(action?.target || '').trim(),
-                        ...this.parseActionIntent(action?.intent || `${action?.effect || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`)
-                    }))
-                    .filter((action) => action.target && action.effect);
-
-                if (normalizedActions.length === 0) {
-                    return;
-                }
-
-                const normalized = {
-                    id: String(rule.id || '').trim() || `rule-${index + 1}`,
-                    scope,
-                    actions: normalizedActions
-                };
-
-                const whenFromJsonLogic = this.parseJsonLogicText(rule.whenJsonLogic);
-                if (whenFromJsonLogic) {
-                    normalized.when = whenFromJsonLogic;
-                    out.push(normalized);
-                    return;
-                }
-
-                const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
-                const conditionErrors = conditions
-                    .map((condition) => this.validateConditionField(condition) || this.validateConditionValue(condition))
-                    .filter(Boolean);
-                if (conditionErrors.length > 0) {
-                    return;
-                }
-
-                const simpleConditions = conditions
-                    .map((condition) => this.buildJsonLogicFromSimpleCondition(condition))
-                    .filter(Boolean);
-
-                if (simpleConditions.length === 1) {
-                    normalized.when = simpleConditions[0];
-                } else if (simpleConditions.length > 1) {
-                    const matchMode = String(rule.conditionMatchMode || 'all').trim();
-                    normalized.when = matchMode === 'any'
-                        ? { any: simpleConditions }
-                        : { all: simpleConditions };
-                }
-
-                out.push(normalized);
-            });
-
-            return out;
         },
 
         initFromDefinitionJson() {
@@ -589,20 +335,225 @@ function formDesigner() {
             }
 
             this.controls = this.hydrateControls(layout, dataSchema, '#');
-            this.rules = this.hydrateRules(Array.isArray(definition.rules) ? definition.rules : []);
+            this.recomputeDerivedStateKeys();
+            const hydratedRules = this.hydrateRules(Array.isArray(definition.rules) ? definition.rules : []);
+            this.deriveDecisionTableFromRules(hydratedRules);
             this.clearSelection();
+        },
+
+        deriveDecisionTableFromRules(sourceRules = []) {
+            const grouped = new Map();
+            sourceRules.forEach((rule) => {
+                const scope = String(rule?.scope || 'form').trim() || 'form';
+                if (!grouped.has(scope)) {
+                    grouped.set(scope, []);
+                }
+                grouped.get(scope).push(rule);
+            });
+
+            this.decisionTables = [];
+
+            if (grouped.size === 0) {
+                const empty = this.newDecisionTable('Table 1');
+                this.decisionTables.push(empty);
+                this.selectDecisionTable(empty.id);
+                return;
+            }
+
+            let tableCount = 0;
+            grouped.forEach((rulesForScope, scope) => {
+                tableCount += 1;
+                const table = this.newDecisionTable(`Table ${tableCount}`);
+                table.scope = scope;
+                table.rules = rulesForScope;
+
+                const inputMap = new Map();
+                const actionMap = new Map();
+                const inputColumns = [];
+                const actionColumns = [];
+
+                table.rules.forEach((rule) => {
+                    const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+                    conditions.forEach((condition) => {
+                        const field = String(condition?.field || '').trim();
+                        if (!field || !field.startsWith('data.')) {
+                            return;
+                        }
+                        const stateKey = field.substring(5);
+                        if (!stateKey || inputMap.has(stateKey)) {
+                            return;
+                        }
+                        const column = this.newDecisionInputColumn(stateKey);
+                        inputMap.set(stateKey, column.id);
+                        inputColumns.push(column);
+                    });
+
+                    const actions = Array.isArray(rule.actions) ? rule.actions : [];
+                    actions.forEach((action) => {
+                        const kind = String(action?.kind || '').trim().toLowerCase();
+                        if (kind === 'api' || action?.endpoint) {
+                            const endpoint = String(action?.endpoint || '').trim();
+                            if (!endpoint) {
+                                return;
+                            }
+                            const method = String(action?.method || 'get').trim().toLowerCase() || 'get';
+                            const trigger = String(action?.trigger || 'change').trim().toLowerCase() || 'change';
+                            const target = String(action?.target || '').trim();
+                            const swap = String(action?.swap || 'innerHTML').trim() || 'innerHTML';
+                            const valsTemplate = String(action?.valsTemplate || '').trim();
+                            const key = `api::${endpoint}::${method}::${trigger}::${target}::${swap}::${valsTemplate}`;
+                            if (actionMap.has(key)) {
+                                return;
+                            }
+                            const column = this.newDecisionActionColumn({
+                                kind: 'api',
+                                apiEndpoint: endpoint,
+                                apiMethod: method,
+                                apiTrigger: trigger,
+                                apiTarget: target,
+                                apiSwap: swap,
+                                apiValsTemplate: valsTemplate
+                            });
+                            actionMap.set(key, column.id);
+                            actionColumns.push(column);
+                            return;
+                        }
+
+                        const target = String(action?.target || '').trim();
+                        const intent = this.parseActionIntent(action?.intent || `${action?.effect || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`);
+                        const property = String(intent.effect || 'visible').trim() || 'visible';
+                        if (!target) {
+                            return;
+                        }
+                        const key = `${target}::${property}`;
+                        if (actionMap.has(key)) {
+                            return;
+                        }
+                        const column = this.newDecisionActionColumn({ kind: 'ui', target, property });
+                        actionMap.set(key, column.id);
+                        actionColumns.push(column);
+                    });
+                });
+
+                table.decisionInputColumns = inputColumns;
+                table.decisionActionColumns = actionColumns;
+                if (table.decisionInputColumns.length === 0) {
+                    const firstStateKey = this.availableStateKeys()[0] || '';
+                    table.decisionInputColumns.push(this.newDecisionInputColumn(firstStateKey));
+                }
+                if (table.decisionActionColumns.length === 0) {
+                    table.decisionActionColumns.push(this.newDecisionActionColumn('', 'visible'));
+                }
+
+                table.rules.forEach((rule) => {
+                    rule.decisionInputs = {};
+                    rule.decisionActions = {};
+
+                    table.decisionInputColumns.forEach((column) => {
+                        rule.decisionInputs[column.id] = { op: 'eq', value: '' };
+                    });
+                    table.decisionActionColumns.forEach((column) => {
+                        rule.decisionActions[column.id] = '';
+                    });
+
+                    const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
+                    conditions.forEach((condition) => {
+                        const field = String(condition?.field || '').trim();
+                        if (!field.startsWith('data.')) {
+                            return;
+                        }
+                        const stateKey = field.substring(5);
+                        const columnId = inputMap.get(stateKey);
+                        if (!columnId) {
+                            return;
+                        }
+                        const op = String(condition?.op || 'eq').trim() || 'eq';
+                        const cell = { op, value: '' };
+                        if (op === 'in' || op === 'notIn') {
+                            cell.value = String(condition?.valuesText || '').trim();
+                        } else if (op === 'exists') {
+                            cell.value = 'true';
+                        } else {
+                            cell.value = String(condition?.value || '').trim();
+                        }
+                        rule.decisionInputs[columnId] = cell;
+                    });
+
+                    const actions = Array.isArray(rule.actions) ? rule.actions : [];
+                    actions.forEach((action) => {
+                        const kind = String(action?.kind || '').trim().toLowerCase();
+                        if (kind === 'api' || action?.endpoint) {
+                            const endpoint = String(action?.endpoint || '').trim();
+                            if (!endpoint) {
+                                return;
+                            }
+                            const method = String(action?.method || 'get').trim().toLowerCase() || 'get';
+                            const trigger = String(action?.trigger || 'change').trim().toLowerCase() || 'change';
+                            const target = String(action?.target || '').trim();
+                            const swap = String(action?.swap || 'innerHTML').trim() || 'innerHTML';
+                            const valsTemplate = String(action?.valsTemplate || '').trim();
+                            const key = `api::${endpoint}::${method}::${trigger}::${target}::${swap}::${valsTemplate}`;
+                            const columnId = actionMap.get(key);
+                            if (!columnId) {
+                                return;
+                            }
+                            rule.decisionActions[columnId] = 'true';
+                            return;
+                        }
+
+                        const target = String(action?.target || '').trim();
+                        const intent = this.parseActionIntent(action?.intent || `${action?.effect || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`);
+                        const property = String(intent.effect || 'visible').trim() || 'visible';
+                        const key = `${target}::${property}`;
+                        const columnId = actionMap.get(key);
+                        if (!columnId) {
+                            return;
+                        }
+                        rule.decisionActions[columnId] = intent.value ? 'true' : 'false';
+                    });
+                });
+
+                this.decisionTables.push(table);
+            });
+
+            this.selectDecisionTable(this.decisionTables[0].id);
         },
 
         hydrateRules(rules) {
             return rules.map((rule, index) => {
                 const hydratedActions = Array.isArray(rule.actions) && rule.actions.length > 0
                     ? rule.actions
-                        .map((action) => ({
-                            target: String(action?.target || '').trim(),
-                            intent: `${String(action?.effect || 'visible').trim() || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`
-                        }))
-                        .filter((action) => action.target)
+                        .map((action) => {
+                            const kind = String(action?.kind || '').trim().toLowerCase();
+                            if (kind === 'api' || action?.endpoint) {
+                                const endpoint = String(action?.endpoint || '').trim();
+                                if (!endpoint) {
+                                    return null;
+                                }
+                                return {
+                                    kind: 'api',
+                                    endpoint,
+                                    method: String(action?.method || 'get').trim().toLowerCase() || 'get',
+                                    trigger: String(action?.trigger || 'change').trim().toLowerCase() || 'change',
+                                    target: String(action?.target || '').trim(),
+                                    swap: String(action?.swap || 'innerHTML').trim() || 'innerHTML',
+                                    valsTemplate: String(action?.valsTemplate || '').trim()
+                                };
+                            }
+
+                            const target = String(action?.target || '').trim();
+                            if (!target) {
+                                return null;
+                            }
+                            return {
+                                kind: 'ui',
+                                target,
+                                intent: `${String(action?.effect || 'visible').trim() || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`
+                            };
+                        })
+                        .filter(Boolean)
                     : [{
+                        kind: 'ui',
                         target: String(rule.target || ''),
                         intent: `${String(rule.effect || 'visible')}:${this.normalizeBoolean(rule.value) ? 'true' : 'false'}`
                     }].filter((action) => action.target);
@@ -880,7 +831,8 @@ function formDesigner() {
                 key: this.toIdentifier(column.key || `column${index + 1}`),
                 title: String(column.title || column.key || `Column ${index + 1}`),
                 type: String(column.type || 'string'),
-                required: column.required === true
+                required: column.required === true,
+                visible: column.visible !== false
             }));
         }
     };

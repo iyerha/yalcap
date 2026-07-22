@@ -128,6 +128,74 @@
     gap: 12px;
 }
 
+.canvas-header-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.viewport-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--surface) 88%, var(--bg));
+}
+
+.viewport-btn {
+    border: 0;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: transparent;
+    cursor: pointer;
+}
+
+.viewport-btn.is-active {
+    color: var(--accent-contrast);
+    background: var(--accent);
+}
+
+.canvas-preview-stage {
+    width: 100%;
+}
+
+.canvas-preview-frame {
+    width: 100%;
+    margin: 0 auto;
+    transition: max-width 160ms ease;
+}
+
+.canvas-preview-frame.mode-tablet {
+    max-width: 834px;
+}
+
+.canvas-preview-frame.mode-phone {
+    max-width: 390px;
+}
+
+.canvas-preview-frame.mode-tablet .canvas {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.canvas-preview-frame.mode-phone .canvas {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.canvas-preview-frame.mode-tablet .nested-dropzone.nested-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.canvas-preview-frame.mode-phone .nested-dropzone.nested-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .canvas-legend {
     display: inline-flex;
     align-items: center;
@@ -581,113 +649,6 @@
     margin-top: 8px;
 }
 
-.preview-table-wrap {
-    overflow-x: auto;
-}
-
-.table-column-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-    margin-bottom: 6px;
-}
-
-.table-col-icon-btn {
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    border: 1px solid color-mix(in oklab, var(--accent) 80%, black);
-    background: var(--accent);
-    color: var(--accent-contrast);
-}
-
-.table-col-icon-btn:hover:not(:disabled) {
-    filter: brightness(0.95);
-}
-
-.table-col-icon-btn:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.preview-container {
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    background: color-mix(in oklab, var(--surface) 90%, var(--bg));
-    display: grid;
-    gap: 4px;
-}
-
-.preview-section {
-    border-left: 4px solid color-mix(in oklab, var(--accent) 70%, white);
-}
-
-.preview-group {
-    border-left: 4px solid color-mix(in oklab, var(--text) 55%, white);
-}
-
-.nested-dropzone {
-    border: 1px dashed var(--border);
-    border-radius: 8px;
-    padding: 8px;
-    display: grid;
-    gap: 6px;
-}
-
-.nested-dropzone.nested-grid {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    align-content: start;
-}
-
-.nested-dropzone.nested-grid > .subtle {
-    grid-column: 1 / -1;
-}
-
-.nested-runtime-control {
-    border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
-    border-radius: 8px;
-    background: color-mix(in oklab, var(--surface) 96%, var(--bg));
-    padding: 8px 8px 22px;
-    display: grid;
-    gap: 6px;
-    cursor: default;
-    position: relative;
-}
-
-.nested-runtime-control > :not(.resize-row) {
-    position: relative;
-    z-index: 1;
-}
-
-.nested-runtime-control.active {
-    border-style: solid;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-}
-
-.nested-runtime-control .resize-row {
-    right: 8px;
-    bottom: 6px;
-}
-
-.nested-runtime-control.active .resize-row {
-    opacity: 1;
-}
-
-.nested-runtime-control .preview-label {
-    margin-bottom: 2px;
-}
-
-.nested-runtime-control .preview-image-placeholder {
-    min-height: 78px;
-    padding: 8px;
-}
-
 .default-indicator {
     position: absolute;
     top: 8px;
@@ -818,5 +779,15 @@
 @media (max-width: 720px) {
     .canvas {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .canvas-header-tools {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .canvas-preview-frame.mode-phone,
+    .canvas-preview-frame.mode-tablet {
+        max-width: 100%;
     }
 }

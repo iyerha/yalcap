@@ -345,7 +345,7 @@
             }
             formData.append('createdBy', 'designer');
 
-            const tenantId = (windowAny.yalcapTenantId || '').toString().trim();
+            const tenantId = (windowAny.tenantId || '').toString().trim();
             const uploadUrl = tenantId ? `/t/${tenantId}/api/assets/upload` : '/api/assets/upload';
 
             try {

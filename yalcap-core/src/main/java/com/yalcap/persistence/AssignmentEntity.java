@@ -53,6 +53,8 @@ public class AssignmentEntity {
     public void setInstanceId(UUID instanceId) { this.instanceId = instanceId; }
     public String getStepId() { return stepId; }
     public void setStepId(String stepId) { this.stepId = stepId; }
+    public UUID getTenantId() { return tenantId; }
+    public void setTenantId(UUID tenantId) { this.tenantId = tenantId; }
     public String getAssigneeType() { return assigneeType; }
     public AssigneeType getAssigneeTypeValue() { return AssigneeType.valueOf(assigneeType); }
     public void setAssigneeType(String assigneeType) { this.assigneeType = assigneeType; }

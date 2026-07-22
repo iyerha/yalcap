@@ -1,6 +1,8 @@
 export {};
 
 declare global {
+  type AnyRecord = Record<string, any>;
+
   interface DesignerBaseControl {
     id?: string;
     name: string;
@@ -82,8 +84,43 @@ declare global {
     emitters: Record<string, SchemaEmitter>;
   }
 
+  interface DesignerControlHookContext {
+    sourceId?: string;
+    control?: DesignerControl;
+    controlId?: string;
+    container?: DesignerControl;
+  }
+
+  interface DesignerCoreApi {
+    createDefaultOptions?: () => Array<{ label: string; value: string; autoValue?: boolean }>;
+    toIdentifier?: (value: string) => string;
+    isJsSafeIdentifier?: (value: string) => boolean;
+  }
+
+  interface DesignerControlHooksApi {
+    normalize?: (control: DesignerControl, api: DesignerCoreApi) => DesignerControl;
+    validate?: (normalized: DesignerControl, errors: string[], api: DesignerCoreApi) => void;
+    canInsertIntoSource?: (context: DesignerControlHookContext) => boolean;
+  }
+
+  type DesignerControlHookRegistry = Record<string, DesignerControlHooksApi>;
+
+  interface RuntimeClientModule {
+    initialized: boolean;
+    bindAll: () => void;
+  }
+
+  interface RuntimeAutocompleteModule extends RuntimeClientModule {}
+  interface RuntimeSectionsModule extends RuntimeClientModule {}
+  interface RuntimeRepeatsModule extends RuntimeClientModule {}
+
   interface Window {
     formDesignerSchemaControls?: DesignerSchemaControlsApi;
-    yalcapTenantId?: string;
+    designerControlHooks?: DesignerControlHookRegistry;
+    runtimeAutocomplete?: RuntimeAutocompleteModule;
+    autocompleteRuntime?: RuntimeAutocompleteModule;
+    runtimeSections?: RuntimeSectionsModule;
+    runtimeRepeats?: RuntimeRepeatsModule;
+    tenantId?: string;
   }
 }

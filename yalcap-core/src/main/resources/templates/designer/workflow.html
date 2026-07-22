@@ -10,8 +10,17 @@
     <script defer th:src="@{/js/designer/workflow/designer-workflow-palette.js}" src="/js/designer/workflow/designer-workflow-palette.js"></script>
     <script defer th:src="@{/js/designer/workflow/designer-workflow-canvas.js}" src="/js/designer/workflow/designer-workflow-canvas.js"></script>
     <script defer th:src="@{/js/designer/workflow/designer-workflow.js}" src="/js/designer/workflow/designer-workflow.js"></script>
+    <script defer th:src="@{/js/runtime/runtime-autocomplete.js}" src="/js/runtime/runtime-autocomplete.js"></script>
+    <script defer th:src="@{/js/runtime/runtime-sections.js}" src="/js/runtime/runtime-sections.js"></script>
+    <script defer th:src="@{/js/runtime/runtime-repeats.js}" src="/js/runtime/runtime-repeats.js"></script>
+    <th:block th:if="${designerJsAssets != null}" th:each="asset : ${designerJsAssets}">
+        <script defer th:src="@{${asset}}"></script>
+    </th:block>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
     <link rel="stylesheet" th:href="@{/css/designer/workflow/designer-workflow.css}" href="/css/designer/workflow/designer-workflow.css" />
+    <th:block th:if="${designerCssAssets != null}" th:each="asset : ${designerCssAssets}">
+        <link rel="stylesheet" th:href="@{${asset}}" />
+    </th:block>
 </head>
 <body>
     <div x-data="workflowDesigner()" x-init="init()" class="page">
@@ -28,6 +37,7 @@
             <label for="definitionKey">Definition key</label>
             <input id="definitionKey" x-model="definitionKey" />
             <button type="button" @click="generate()">Refresh JSON</button>
+            <button type="button" @click="refreshRuntimePreview()">Preview Runtime HTML</button>
         </section>
 
         <main class="layout" :class="{ 'palette-collapsed': paletteCollapsed, 'properties-collapsed': propertiesCollapsed }">
@@ -177,6 +187,16 @@
 
                     <button type="submit">Publish workflow</button>
                 </form>
+
+                <div class="runtime-preview">
+                    <div class="runtime-preview-header">
+                        <h4>Runtime HTML Preview</h4>
+                        <button type="button" @click="refreshRuntimePreview()" :disabled="runtimePreviewLoading">Refresh Preview</button>
+                    </div>
+                    <p class="subtle" x-show="runtimePreviewLoading" x-cloak>Loading preview...</p>
+                    <p class="subtle error" x-show="runtimePreviewError" x-text="runtimePreviewError" x-cloak></p>
+                    <div class="runtime-preview-body" x-show="runtimePreviewHtml" x-html="runtimePreviewHtml" x-cloak></div>
+                </div>
             </section>
         </main>
 

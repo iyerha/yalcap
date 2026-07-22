@@ -1,0 +1,12 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <div class="runtime-repeat-meta"
+             th:attr="data-repeat-renderer=${control.renderModel != null ? control.renderModel['renderer'] : 'table'},
+                      data-repeat-min-items=${control.renderModel != null ? control.renderModel['minItems'] : 0},
+                      data-repeat-max-items=${control.renderModel != null ? control.renderModel['maxItems'] : 0}">
+            <div class="runtime-repeat-toolbar">
+                <button type="button" class="runtime-repeat-add" data-repeat-add>Add row</button>
+            </div>
+        </div>
+    </th:block>
+</th:block>

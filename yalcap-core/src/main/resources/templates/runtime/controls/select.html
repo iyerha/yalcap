@@ -1,0 +1,17 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <th:block th:with="multiple=${control.renderModel != null and control.renderModel['multiple'] == true}">
+            <select th:attr="name=${multiple ? control.stateKey + '[]' : control.stateKey},
+                             multiple=${multiple ? 'multiple' : null},
+                             disabled=${!control.enabled}"
+                    th:required="${control.required}">
+            <option th:if="${control.renderModel != null and control.renderModel['placeholder'] != null and control.renderModel['placeholder'] != ''}"
+                    value=""
+                    th:text="${control.renderModel['placeholder']}"></option>
+            <option th:each="opt : ${control.renderModel != null ? control.renderModel['options'] : null}"
+                    th:attr="value=${opt['value']}"
+                    th:text="${opt['label']}"></option>
+            </select>
+        </th:block>
+    </th:block>
+</th:block>

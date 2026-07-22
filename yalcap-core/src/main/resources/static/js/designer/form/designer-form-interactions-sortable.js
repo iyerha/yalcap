@@ -20,7 +20,8 @@
                     sort: false,
                     animation: 120,
                     ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen'
+                    chosenClass: 'sortable-chosen',
+                    onClone: (/** @type {any} */ evt) => this.preparePaletteClone(evt)
                 });
             }
 
@@ -31,6 +32,10 @@
                     draggable: '.canvas-item',
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
+                    fallbackTolerance: 6,
+                    swapThreshold: 0.65,
+                    invertSwap: true,
+                    invertedSwapThreshold: 0.25,
                     filter: 'input, textarea, select, button, option, label, .remove-control-btn',
                     preventOnFilter: false,
                     onAdd: (/** @type {any} */ evt) => this.handleSortableAdd(evt, '__root__'),
@@ -118,6 +123,10 @@
                     draggable: '.nested-runtime-control',
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
+                    fallbackTolerance: 6,
+                    swapThreshold: 0.65,
+                    invertSwap: true,
+                    invertedSwapThreshold: 0.25,
                     filter: 'input, textarea, select, button, option, label, .remove-control-btn',
                     preventOnFilter: false,
                     onAdd: (/** @type {any} */ evt) => this.handleSortableAdd(evt, sourceId),
@@ -150,8 +159,26 @@
                     return;
                 }
 
+                if (!this.canInsertIntoSource(targetSourceId, created)) {
+                    this.flashInvalidDrop(evt.to);
+                    if (evt.item.parentNode) {
+                        evt.item.parentNode.removeChild(evt.item);
+                    }
+                    this.syncSortableDom();
+                    return;
+                }
+
                 if (!this.insertControlIntoSource(targetSourceId, created, rawIndex)) {
-                    this.controls.push(created);
+                    if (targetSourceId === '__root__') {
+                        this.controls.push(created);
+                    } else {
+                        this.flashInvalidDrop(evt.to);
+                        if (evt.item.parentNode) {
+                            evt.item.parentNode.removeChild(evt.item);
+                        }
+                        this.syncSortableDom();
+                        return;
+                    }
                 }
 
                 if (evt.item.parentNode) {
@@ -174,6 +201,13 @@
                 return;
             }
 
+            const movingRef = this.findControlById(controlId);
+            if (!movingRef || !this.canInsertIntoSource(targetSourceId, movingRef.control, controlId)) {
+                this.flashInvalidDrop(evt.to);
+                this.syncSortableDom();
+                return;
+            }
+
             const moved = this.detachControl(controlId);
             if (!moved) {
                 this.flashInvalidDrop(evt.to);
@@ -182,7 +216,13 @@
             }
 
             if (!this.insertControlIntoSource(targetSourceId, moved, rawIndex)) {
-                this.controls.push(moved);
+                if (targetSourceId === '__root__') {
+                    this.controls.push(moved);
+                } else {
+                    this.flashInvalidDrop(evt.to);
+                    this.syncSortableDom();
+                    return;
+                }
             }
 
             this.clearSelection();
@@ -240,6 +280,10 @@
                 return false;
             }
 
+            if (!this.canInsertIntoSource(sourceId, control)) {
+                return false;
+            }
+
             const targetIndex = Number.isInteger(index)
                 ? Math.max(0, Math.min(index, list.length))
                 : list.length;
@@ -248,11 +292,81 @@
             return true;
         },
 
+        /** @param {string} widget */
+        getControlDesignerHooks(widget) {
+            const key = String(widget || '').trim().toLowerCase();
+            if (!key) {
+                return null;
+            }
+
+            const registry = windowAny.designerControlHooks;
+            if (!registry || typeof registry !== 'object') {
+                return null;
+            }
+
+            return registry[key] || null;
+        },
+
+        /** @param {string} sourceId @param {any} control @param {string=} controlId */
+        canInsertIntoSource(sourceId, control, controlId = '') {
+            if (sourceId === '__root__') {
+                return true;
+            }
+
+            const containerRef = this.findControlById(sourceId);
+            if (!containerRef || !containerRef.control) {
+                return false;
+            }
+
+            const containerWidget = String(containerRef.control.widget || '').trim();
+            const hooks = this.getControlDesignerHooks(containerWidget);
+            if (!hooks || typeof hooks.canInsertIntoSource !== 'function') {
+                return true;
+            }
+
+            return hooks.canInsertIntoSource({
+                sourceId,
+                control,
+                controlId,
+                container: containerRef.control
+            }) !== false;
+        },
+
         syncSortableDom() {
+            this.recomputeDerivedStateKeys();
             this.controls = [...this.controls];
             this.$nextTick(() => {
                 this.setupNestedSortables();
                 this.initDesignerWidgets();
+            });
+        },
+
+        /** @param {any} evt */
+        preparePaletteClone(evt) {
+            if (!evt || !evt.clone) {
+                return;
+            }
+
+            const clone = evt.clone;
+            clone.setAttribute('x-ignore', '');
+            this.stripAlpineAttrs(clone);
+        },
+
+        /** @param {Element} root */
+        stripAlpineAttrs(root) {
+            if (!root || !root.querySelectorAll) {
+                return;
+            }
+
+            const nodes = [root, ...root.querySelectorAll('*')];
+            nodes.forEach((node) => {
+                const attrs = Array.from(node.attributes || []);
+                attrs.forEach((attr) => {
+                    const name = String(attr.name || '');
+                    if (name.startsWith('x-') || name.startsWith(':') || name.startsWith('@')) {
+                        node.removeAttribute(name);
+                    }
+                });
             });
         },
 

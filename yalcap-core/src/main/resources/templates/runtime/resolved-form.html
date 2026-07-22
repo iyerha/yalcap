@@ -1,0 +1,68 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <section class="card" th:fragment="content"
+             th:attr="data-runtime-js-assets=${runtimeJsAssets != null ? #strings.listJoin(runtimeJsAssets, ',') : ''},
+                      data-runtime-css-assets=${runtimeCssAssets != null ? #strings.listJoin(runtimeCssAssets, ',') : ''}">
+        <h3>Resolved Form</h3>
+        <p class="subtle" th:text="'Definition: ' + ${definitionKey}"></p>
+        <form class="resolved-form-stack" novalidate>
+            <th:block th:each="control : ${controls}">
+                <th:block th:replace="~{runtime/resolved-form :: control(control=${control})}"></th:block>
+            </th:block>
+        </form>
+    </section>
+
+    <th:block th:fragment="control(control)">
+        <div class="resolved-control"
+             th:classappend="' widget-' + ${control.widget}"
+             th:attr="data-state-key=${control.stateKey},
+                      data-section-collapsible=${control.widget == 'section' ? (control.renderModel != null and control.renderModel['collapsible'] == true ? 'true' : 'false') : null},
+                      data-section-collapsed=${control.widget == 'section' ? (control.renderModel != null and control.renderModel['collapsed'] == true ? 'true' : 'false') : null},
+                      data-repeat-min-items=${control.widget == 'repeat' ? (control.renderModel != null ? control.renderModel['minItems'] : 0) : null},
+                      data-repeat-max-items=${control.widget == 'repeat' ? (control.renderModel != null ? control.renderModel['maxItems'] : 0) : null},
+                      hx-get=${control.hxGet},
+                      hx-post=${control.hxPost},
+                      hx-method=${control.hxMethod},
+                      hx-trigger=${control.hxTrigger},
+                      hx-target=${control.hxTarget},
+                      hx-swap=${control.hxSwap},
+                      hx-vals=${control.hxVals}">
+            <th:block th:if="${control.widget == 'section'}">
+                <div class="runtime-section-header">
+                    <label th:text="${control.label != '' ? control.label : (control.name != '' ? control.name : control.stateKey)}"></label>
+                    <button type="button"
+                            class="runtime-section-toggle"
+                            data-section-toggle
+                            th:if="${control.renderModel != null and control.renderModel['collapsible'] == true}"
+                            th:attr="aria-expanded=${control.renderModel != null and control.renderModel['collapsed'] == true ? 'false' : 'true'}"
+                            th:text="${control.renderModel != null and control.renderModel['collapsed'] == true ? 'Expand' : 'Collapse'}"></button>
+                </div>
+            </th:block>
+
+            <label th:if="${control.widget != 'section'}"
+                   th:text="${control.label != '' ? control.label : (control.name != '' ? control.name : control.stateKey)}"></label>
+
+            <th:block th:if="${control.renderFragment != null and control.renderFragment != ''}">
+                <th:block th:replace="~{${control.renderFragment} :: input(control=${control})}"></th:block>
+            </th:block>
+            <input
+                th:if="${(control.renderFragment == null or control.renderFragment == '') and control.widget != 'repeat' and control.widget != 'section' and control.widget != 'group'}"
+                th:attr="type=${control.inputType},
+                         name=${control.stateKey},
+                         placeholder=${control.placeholder != '' ? control.placeholder : control.widget},
+                         min=${control.min},
+                         max=${control.max},
+                         step=${control.step},
+                         disabled=${!control.enabled}"
+                th:required="${control.required}" />
+
+            <div class="resolved-children"
+                 th:if="${control.children != null and !control.children.isEmpty()}"
+                 th:attr="hidden=${control.widget == 'section' and control.renderModel != null and control.renderModel['collapsed'] == true ? 'hidden' : null},
+                          data-repeat-template=${control.widget == 'repeat' ? 'true' : null}">
+                <th:block th:each="child : ${control.children}">
+                    <th:block th:replace="~{runtime/resolved-form :: control(control=${child})}"></th:block>
+                </th:block>
+            </div>
+        </div>
+    </th:block>
+</th:block>

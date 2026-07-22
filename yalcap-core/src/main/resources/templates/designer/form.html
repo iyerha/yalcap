@@ -19,17 +19,27 @@
     <script defer th:src="@{/js/designer/form/designer-form-interactions-resize.js}" src="/js/designer/form/designer-form-interactions-resize.js"></script>
     <script defer th:src="@{/js/designer/form/designer-form-interactions-impl.js}" src="/js/designer/form/designer-form-interactions-impl.js"></script>
     <script defer th:src="@{/js/designer/form/designer-form-interactions.js}" src="/js/designer/form/designer-form-interactions.js"></script>
+    <script defer th:src="@{/js/designer/form/designer-form-rules-table.js}" src="/js/designer/form/designer-form-rules-table.js"></script>
+    <script defer th:src="@{/js/designer/form/designer-form-rules-utils.js}" src="/js/designer/form/designer-form-rules-utils.js"></script>
+    <script defer th:src="@{/js/designer/form/designer-form-rules-compile.js}" src="/js/designer/form/designer-form-rules-compile.js"></script>
+    <script defer th:src="@{/js/designer/form/designer-form-rules.js}" src="/js/designer/form/designer-form-rules.js"></script>
     <script defer th:src="@{/js/designer/form/designer-form.js}" src="/js/designer/form/designer-form.js"></script>
+    <th:block th:if="${designerJsAssets != null}" th:each="asset : ${designerJsAssets}">
+        <script defer th:src="@{${asset}}"></script>
+    </th:block>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.12/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" />
     <link rel="stylesheet" th:href="@{/css/designer/form/designer-form.css}" href="/css/designer/form/designer-form.css" />
     <link rel="stylesheet" th:href="@{/css/designer/form/designer-form-builder.css}" href="/css/designer/form/designer-form-builder.css" />
     <link rel="stylesheet" th:href="@{/css/designer/form/designer-form-rules.css}" href="/css/designer/form/designer-form-rules.css" />
+    <th:block th:if="${designerCssAssets != null}" th:each="asset : ${designerCssAssets}">
+        <link rel="stylesheet" th:href="@{${asset}}" />
+    </th:block>
 </head>
 <body>
     <script th:inline="javascript">
-        window.yalcapTenantId = /*[[${tenantId}]]*/ null;
+        window.tenantId = /*[[${tenantId}]]*/ null;
     </script>
     <div x-data="formDesigner()" x-init="initFromDefinitionJson(); applyTheme(); initSortable()" :data-theme="selectedTheme">
         <h1>Form Designer</h1>

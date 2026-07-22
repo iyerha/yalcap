@@ -79,7 +79,8 @@
             key: child.name,
             title: child.label,
             type: child.type || 'string',
-            required: child.required === true
+            required: child.required === true,
+            visible: true
         }));
 
         ctx.layoutTarget.push({
@@ -107,7 +108,8 @@
                     key: col.key,
                     title: col.title,
                     type: col.type || 'string',
-                    required: col.required === true
+                    required: col.required === true,
+                    visible: col.visible !== false
                 })),
             children: rowLayout
         });

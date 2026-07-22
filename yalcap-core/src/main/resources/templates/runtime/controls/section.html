@@ -1,0 +1,11 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <th:block th:fragment="input(control)">
+        <div class="runtime-section-meta"
+             th:attr="data-collapsible=${control.renderModel != null and control.renderModel['collapsible'] == true ? 'true' : 'false'},
+                      data-default-expanded=${control.renderModel != null and control.renderModel['defaultExpanded'] == true ? 'true' : 'false'}">
+            <p class="subtle"
+               th:if="${control.renderModel != null and control.renderModel['description'] != null and control.renderModel['description'] != ''}"
+               th:text="${control.renderModel['description']}"></p>
+        </div>
+    </th:block>
+</th:block>

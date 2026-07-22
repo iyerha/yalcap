@@ -1,10 +1,15 @@
 package com.yalcap.definition.form;
 
+import com.yalcap.definition.form.control.AutocompleteControlType;
+import com.yalcap.definition.form.control.ControlTypeRegistry;
+import com.yalcap.definition.form.control.DateControlType;
+import com.yalcap.definition.form.control.DateTimeControlType;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,9 +19,14 @@ import static org.mockito.Mockito.when;
 
 class FormDefinitionServiceTest {
 
+  private final ObjectMapper objectMapper = new ObjectMapper();
     private final FormDefinitionRepository repository = Mockito.mock(FormDefinitionRepository.class);
-    private final FormDefinitionService service = new FormDefinitionService(repository);
-    private final ObjectMapper objectMapper = new ObjectMapper();
+  private final ControlTypeRegistry controlTypeRegistry = new ControlTypeRegistry(List.of(
+      new DateControlType(objectMapper),
+      new DateTimeControlType(objectMapper),
+      new AutocompleteControlType(objectMapper)
+  ));
+  private final FormDefinitionService service = new FormDefinitionService(repository, controlTypeRegistry);
 
     @Test
     void publish_acceptsDateDateTimeAndAutocompleteControls() throws Exception {

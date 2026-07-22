@@ -1,0 +1,32 @@
+.preview-table-wrap {
+    overflow-x: auto;
+}
+
+.table-column-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.table-col-icon-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--accent) 80%, black);
+    background: var(--accent);
+    color: var(--accent-contrast);
+}
+
+.table-col-icon-btn:hover:not(:disabled) {
+    filter: brightness(0.95);
+}
+
+.table-col-icon-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}

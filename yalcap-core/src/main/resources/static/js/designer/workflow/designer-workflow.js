@@ -4,6 +4,9 @@ function workflowDesigner() {
         steps: [],
         selectedNodeId: null,
         definitionJson: '',
+        runtimePreviewHtml: '',
+        runtimePreviewError: '',
+        runtimePreviewLoading: false,
         publishMessage: '',
         publishError: false,
         editor: null,
@@ -33,6 +36,150 @@ function workflowDesigner() {
             this.ensureCanvasInteractions();
             this.initEditorWhenReady(0);
             this.generate();
+            this.refreshRuntimePreview();
+        },
+
+        async refreshRuntimePreview() {
+            this.generate();
+            this.runtimePreviewLoading = true;
+            this.runtimePreviewError = '';
+
+            try {
+                const definitionKey = String(this.definitionKey || '').trim();
+                if (!definitionKey) {
+                    throw new Error('Definition key is required.');
+                }
+
+                const response = await fetch('/api/definitions/' + encodeURIComponent(definitionKey) + '/resolved/html', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: '{}'
+                });
+
+                const html = await response.text();
+                if (!response.ok) {
+                    throw new Error('Preview failed with status ' + response.status);
+                }
+
+                await this.loadRuntimeAssetsFromPreviewHtml(html);
+                this.runtimePreviewHtml = html;
+                window.setTimeout(function () {
+                    var autocompleteRuntime = window.runtimeAutocomplete || window.autocompleteRuntime;
+                    if (autocompleteRuntime && typeof autocompleteRuntime.bindAll === 'function') {
+                        autocompleteRuntime.bindAll();
+                    }
+
+                    if (window.runtimeSections && typeof window.runtimeSections.bindAll === 'function') {
+                        window.runtimeSections.bindAll();
+                    }
+
+                    if (window.runtimeRepeats && typeof window.runtimeRepeats.bindAll === 'function') {
+                        window.runtimeRepeats.bindAll();
+                    }
+                }, 0);
+            } catch (error) {
+                this.runtimePreviewHtml = '';
+                this.runtimePreviewError = error instanceof Error ? error.message : String(error);
+            } finally {
+                this.runtimePreviewLoading = false;
+            }
+        },
+
+        parseRuntimeAssetList(raw) {
+            return String(raw || '')
+                .split(',')
+                .map(function (item) { return String(item || '').trim(); })
+                .filter(Boolean);
+        },
+
+        normalizeAssetUrl(assetPath) {
+            try {
+                return new URL(String(assetPath || '').trim(), window.location.origin).href;
+            } catch (_) {
+                return '';
+            }
+        },
+
+        ensureRuntimeCssAsset(assetPath) {
+            var normalized = this.normalizeAssetUrl(assetPath);
+            if (!normalized) {
+                return;
+            }
+
+            var links = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
+            var alreadyLoaded = links.some(function (link) {
+                return link.href === normalized;
+            });
+            if (alreadyLoaded) {
+                return;
+            }
+
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = normalized;
+            link.setAttribute('data-runtime-asset', 'css');
+            document.head.appendChild(link);
+        },
+
+        ensureRuntimeJsAsset(assetPath) {
+            var normalized = this.normalizeAssetUrl(assetPath);
+            if (!normalized) {
+                return Promise.resolve();
+            }
+
+            var existing = Array.from(document.querySelectorAll('script[src]')).find(function (script) {
+                return script.src === normalized;
+            });
+            if (existing) {
+                if (existing.dataset && existing.dataset.loaded === 'true') {
+                    return Promise.resolve();
+                }
+                return new Promise(function (resolve) {
+                    if (existing.dataset && existing.dataset.loading === 'true') {
+                        existing.addEventListener('load', function () { resolve(); }, { once: true });
+                        existing.addEventListener('error', function () { resolve(); }, { once: true });
+                        return;
+                    }
+                    resolve();
+                });
+            }
+
+            return new Promise(function (resolve) {
+                var script = document.createElement('script');
+                script.src = normalized;
+                script.defer = true;
+                script.dataset.runtimeAsset = 'js';
+                script.dataset.loading = 'true';
+                script.addEventListener('load', function () {
+                    script.dataset.loading = 'false';
+                    script.dataset.loaded = 'true';
+                    resolve();
+                }, { once: true });
+                script.addEventListener('error', function () {
+                    script.dataset.loading = 'false';
+                    resolve();
+                }, { once: true });
+                document.head.appendChild(script);
+            });
+        },
+
+        async loadRuntimeAssetsFromPreviewHtml(html) {
+            var documentFragment = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            var host = documentFragment.querySelector('[data-runtime-js-assets], [data-runtime-css-assets]');
+            if (!host) {
+                return;
+            }
+
+            var cssAssets = this.parseRuntimeAssetList(host.getAttribute('data-runtime-css-assets'));
+            var jsAssets = this.parseRuntimeAssetList(host.getAttribute('data-runtime-js-assets'));
+
+            cssAssets.forEach((asset) => this.ensureRuntimeCssAsset(asset));
+            if (jsAssets.length > 0) {
+                await Promise.all(jsAssets.map((asset) => this.ensureRuntimeJsAsset(asset)));
+            }
         },
 
         bindPublishForm() {
@@ -71,6 +218,7 @@ function workflowDesigner() {
 
                     this.publishError = Boolean(errorText);
                     this.publishMessage = errorText || 'Published workflow successfully.';
+                    this.refreshRuntimePreview();
                 } catch (error) {
                     this.publishError = true;
                     this.publishMessage = error instanceof Error ? error.message : String(error);
