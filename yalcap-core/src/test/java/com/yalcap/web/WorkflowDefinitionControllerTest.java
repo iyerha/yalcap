@@ -7,6 +7,7 @@ import com.yalcap.definition.form.control.RepeatControlType;
 import com.yalcap.definition.form.control.SectionControlType;
 import com.yalcap.definition.form.control.SelectControlType;
 import com.yalcap.definition.form.control.TableControlType;
+import com.yalcap.definition.form.control.DateTimeControlType;
 import com.yalcap.definition.form.control.TextControlType;
 import com.yalcap.definition.workflow.WorkflowDefinitionService;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -219,11 +221,11 @@ class WorkflowDefinitionControllerTest {
         assertEquals(3, repeat.getRenderModel().get("maxItems"));
         assertEquals(1, repeat.getChildren().size());
 
-                Object runtimeJsAssetsValue = model.asMap().get("runtimeJsAssets");
-                assertInstanceOf(List.class, runtimeJsAssetsValue);
-                @SuppressWarnings("unchecked")
-                List<String> runtimeJsAssets = (List<String>) runtimeJsAssetsValue;
-                assertTrue(runtimeJsAssets.contains("/js/runtime/runtime-repeats.js"));
+        Object runtimeJsAssetsValue = model.asMap().get("runtimeJsAssets");
+        assertInstanceOf(List.class, runtimeJsAssetsValue);
+        @SuppressWarnings("unchecked")
+        List<String> runtimeJsAssets = (List<String>) runtimeJsAssetsValue;
+        assertTrue(runtimeJsAssets.contains("/js/runtime/runtime-repeats.js"));
     }
 
     @Test
@@ -275,79 +277,118 @@ class WorkflowDefinitionControllerTest {
         List<String> runtimeJsAssets = (List<String>) runtimeJsAssetsValue;
         assertTrue(runtimeJsAssets.contains("/js/runtime/runtime-repeats.js"));
 
-                Object runtimeCssAssetsValue = model.asMap().get("runtimeCssAssets");
-                assertInstanceOf(List.class, runtimeCssAssetsValue);
-                @SuppressWarnings("unchecked")
-                List<String> runtimeCssAssets = (List<String>) runtimeCssAssetsValue;
-                assertTrue(runtimeCssAssets.contains("/css/runtime/runtime-print.css"));
+        Object runtimeCssAssetsValue = model.asMap().get("runtimeCssAssets");
+        assertInstanceOf(List.class, runtimeCssAssetsValue);
+        @SuppressWarnings("unchecked")
+        List<String> runtimeCssAssets = (List<String>) runtimeCssAssetsValue;
+        assertTrue(runtimeCssAssets.contains("/css/runtime/runtime-print.css"));
     }
 
-                @Test
-                void resolveDefinitionHtml_mapsSectionAndGroupFragments() throws Exception {
-                                WorkflowDefinitionService service = Mockito.mock(WorkflowDefinitionService.class);
-                                ControlTypeRegistry registry = new ControlTypeRegistry(List.of(
-                                                                new SectionControlType(objectMapper),
-                                                                new GroupControlType(objectMapper),
-                                                                new TextControlType(objectMapper)
-                                ));
-                                WorkflowDefinitionController controller = new WorkflowDefinitionController(service, registry);
+    @Test
+    void resolveDefinitionHtml_localizesDatetimeValueFromResolvedData() throws Exception {
+        WorkflowDefinitionService service = Mockito.mock(WorkflowDefinitionService.class);
+        ControlTypeRegistry registry = new ControlTypeRegistry(List.of(
+                new DateTimeControlType(objectMapper)
+        ));
+        WorkflowDefinitionController controller = new WorkflowDefinitionController(service, registry);
 
-                                ObjectNode resolved = objectMapper.createObjectNode();
-                                ObjectNode definition = resolved.putObject("definition");
-                                ObjectNode controlSchema = definition.putObject("controlSchema");
-                                controlSchema.putArray("layout")
-                                                                .add(objectMapper.readTree("""
-                                                                                                {
-                                                                                                        "widget": "section",
-                                                                                                        "stateKey": "reviewSection",
-                                                                                                        "label": "Review",
-                                                                                                        "sectionDescription": "Review details",
-                                                                                                        "sectionCollapsible": true,
-                                                                                                        "sectionDefaultExpanded": false,
-                                                                                                        "collapsed": true,
-                                                                                                        "children": [
-                                                                                                                {
-                                                                                                                        "widget": "group",
-                                                                                                                        "name": "address",
-                                                                                                                        "label": "Address",
-                                                                                                                        "groupDescription": "Address fields",
-                                                                                                                        "children": [
-                                                                                                                                {"widget":"text", "stateKey":"street", "label":"Street"}
-                                                                                                                        ]
-                                                                                                                }
-                                                                                                        ]
-                                                                                                }
-                                                                                                """));
+        ObjectNode resolved = objectMapper.createObjectNode();
+        ObjectNode definition = resolved.putObject("definition");
+        ObjectNode controlSchema = definition.putObject("controlSchema");
+        controlSchema.putArray("layout")
+                .add(objectMapper.readTree("""
+                        {
+                          "widget": "datetime",
+                          "stateKey": "scheduledAt",
+                          "label": "Scheduled At",
+                          "enabled": true
+                        }
+                        """));
+        resolved.putObject("data").put("scheduledAt", "2026-07-22T12:00:00Z");
 
-                                when(service.resolveDefinitionView(eq("sample-layout-workflow"), any())).thenReturn(Optional.of(resolved));
+        when(service.resolveDefinitionView(eq("datetime-workflow"), any())).thenReturn(Optional.of(resolved));
 
-                                Model model = new ExtendedModelMap();
-                                controller.resolveDefinitionHtml("sample-layout-workflow", null, model);
+        Model model = new ExtendedModelMap();
+        controller.resolveDefinitionHtml("datetime-workflow", null, model);
 
-                                @SuppressWarnings("unchecked")
-                                List<WorkflowDefinitionController.RenderedControl> controls =
-                                                                (List<WorkflowDefinitionController.RenderedControl>) model.asMap().get("controls");
+        @SuppressWarnings("unchecked")
+        List<WorkflowDefinitionController.RenderedControl> controls =
+                (List<WorkflowDefinitionController.RenderedControl>) model.asMap().get("controls");
 
-                                assertEquals(1, controls.size());
+        assertEquals(1, controls.size());
+        WorkflowDefinitionController.RenderedControl datetime = controls.get(0);
+        assertEquals("runtime/controls/datetime", datetime.getRenderFragment());
+        assertNotNull(datetime.getRenderModel().get("value"));
+        assertTrue(String.valueOf(datetime.getRenderModel().get("value")).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}"));
+        assertFalse("2026-07-22T12:00:00Z".equals(String.valueOf(datetime.getRenderModel().get("value"))));
+    }
 
-                                WorkflowDefinitionController.RenderedControl section = controls.get(0);
-                                assertEquals("runtime/controls/section", section.getRenderFragment());
-                                assertEquals("Review details", section.getRenderModel().get("description"));
-                                assertEquals(true, section.getRenderModel().get("collapsible"));
-                                assertEquals(false, section.getRenderModel().get("defaultExpanded"));
-                                assertEquals(true, section.getRenderModel().get("collapsed"));
-                                assertEquals(1, section.getChildren().size());
+    @Test
+    void resolveDefinitionHtml_mapsSectionAndGroupFragments() throws Exception {
+        WorkflowDefinitionService service = Mockito.mock(WorkflowDefinitionService.class);
+        ControlTypeRegistry registry = new ControlTypeRegistry(List.of(
+                new SectionControlType(objectMapper),
+                new GroupControlType(objectMapper),
+                new TextControlType(objectMapper)
+        ));
+        WorkflowDefinitionController controller = new WorkflowDefinitionController(service, registry);
 
-                                WorkflowDefinitionController.RenderedControl group = section.getChildren().get(0);
-                                assertEquals("runtime/controls/group", group.getRenderFragment());
-                                assertEquals("address", group.getRenderModel().get("name"));
-                                assertEquals("Address fields", group.getRenderModel().get("description"));
+        ObjectNode resolved = objectMapper.createObjectNode();
+        ObjectNode definition = resolved.putObject("definition");
+        ObjectNode controlSchema = definition.putObject("controlSchema");
+        controlSchema.putArray("layout")
+                .add(objectMapper.readTree("""
+                        {
+                          "widget": "section",
+                          "stateKey": "reviewSection",
+                          "label": "Review",
+                          "sectionDescription": "Review details",
+                          "sectionCollapsible": true,
+                          "sectionDefaultExpanded": false,
+                          "collapsed": true,
+                          "children": [
+                            {
+                              "widget": "group",
+                              "name": "address",
+                              "label": "Address",
+                              "groupDescription": "Address fields",
+                              "children": [
+                                {"widget":"text", "stateKey":"street", "label":"Street"}
+                              ]
+                            }
+                          ]
+                        }
+                        """));
 
-                                Object runtimeJsAssetsValue = model.asMap().get("runtimeJsAssets");
-                                assertInstanceOf(List.class, runtimeJsAssetsValue);
-                                @SuppressWarnings("unchecked")
-                                List<String> runtimeJsAssets = (List<String>) runtimeJsAssetsValue;
-                                assertTrue(runtimeJsAssets.contains("/js/runtime/runtime-sections.js"));
+        when(service.resolveDefinitionView(eq("sample-layout-workflow"), any())).thenReturn(Optional.of(resolved));
+
+        Model model = new ExtendedModelMap();
+        controller.resolveDefinitionHtml("sample-layout-workflow", null, model);
+
+        @SuppressWarnings("unchecked")
+        List<WorkflowDefinitionController.RenderedControl> controls =
+                (List<WorkflowDefinitionController.RenderedControl>) model.asMap().get("controls");
+
+        assertEquals(1, controls.size());
+
+        WorkflowDefinitionController.RenderedControl section = controls.get(0);
+        assertEquals("runtime/controls/section", section.getRenderFragment());
+        assertEquals("Review details", section.getRenderModel().get("description"));
+        assertEquals(true, section.getRenderModel().get("collapsible"));
+        assertEquals(false, section.getRenderModel().get("defaultExpanded"));
+        assertEquals(true, section.getRenderModel().get("collapsed"));
+        assertEquals(1, section.getChildren().size());
+
+        WorkflowDefinitionController.RenderedControl group = section.getChildren().get(0);
+        assertEquals("runtime/controls/group", group.getRenderFragment());
+        assertEquals("address", group.getRenderModel().get("name"));
+        assertEquals("Address fields", group.getRenderModel().get("description"));
+
+        Object runtimeJsAssetsValue = model.asMap().get("runtimeJsAssets");
+        assertInstanceOf(List.class, runtimeJsAssetsValue);
+        @SuppressWarnings("unchecked")
+        List<String> runtimeJsAssets = (List<String>) runtimeJsAssetsValue;
+        assertTrue(runtimeJsAssets.contains("/js/runtime/runtime-sections.js"));
     }
 
     @Test

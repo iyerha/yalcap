@@ -2,6 +2,7 @@
     <th:block th:fragment="input(control)">
         <input type="datetime-local"
                th:attr="name=${control.stateKey},
+                        data-datetime-value=${control.renderModel != null ? control.renderModel['value'] : ''},
                         placeholder=${control.renderModel != null ? control.renderModel['placeholder'] : ''},
                         min=${control.renderModel != null ? control.renderModel['min'] : ''},
                         max=${control.renderModel != null ? control.renderModel['max'] : ''},

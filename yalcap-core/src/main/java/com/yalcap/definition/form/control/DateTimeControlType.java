@@ -38,7 +38,12 @@ public class DateTimeControlType implements ControlType {
             "control.type.datetime",
                 propertySchema,
                 defaultConfig,
-                ControlTypeClientAssets.NONE
+            new ControlTypeClientAssets(
+                java.util.List.of(),
+                java.util.List.of("/js/runtime/runtime-datetime.js"),
+                java.util.List.of(),
+                java.util.List.of()
+            )
         );
     }
 

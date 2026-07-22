@@ -30,6 +30,11 @@ import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 @Controller
 @RequestMapping("/api/definitions")
@@ -82,18 +87,20 @@ public class WorkflowDefinitionController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
         JsonNode layout = resolved.path("definition").path("controlSchema").path("layout");
+        JsonNode data = resolved.path("data");
         Locale locale = LocaleContextHolder.getLocale();
         ControlTextDirection direction = inferDirection(locale);
         AssetCollector assets = new AssetCollector();
         assets.addRuntimeCss(SHARED_RUNTIME_PRINT_CSS);
         model.addAttribute("definitionKey", definitionKey);
-        model.addAttribute("controls", mapRenderedControls(layout, locale, direction, assets));
+        model.addAttribute("controls", mapRenderedControls(layout, data, locale, direction, assets));
         model.addAttribute("runtimeJsAssets", assets.runtimeJs());
         model.addAttribute("runtimeCssAssets", assets.runtimeCss());
         return "runtime/resolved-form :: content";
     }
 
     private List<RenderedControl> mapRenderedControls(JsonNode layout,
+                                  JsonNode data,
                                                       Locale locale,
                                                       ControlTextDirection direction,
                                                       AssetCollector assets) {
@@ -131,9 +138,10 @@ public class WorkflowDefinitionController {
                 control.hxVals = trim(runtimeHtmx.path("hxVals").asString());
             }
 
-            applyControlTypeRender(control, node, locale, direction, assets);
+            applyControlTypeRender(control, node, data, locale, direction, assets);
+            applyControlValue(control, node, data);
 
-            control.children = mapRenderedControls(node.path("children"), locale, direction, assets);
+            control.children = mapRenderedControls(node.path("children"), data, locale, direction, assets);
             controls.add(control);
         }
 
@@ -175,6 +183,7 @@ public class WorkflowDefinitionController {
 
     private void applyControlTypeRender(RenderedControl control,
                                         JsonNode node,
+                                        JsonNode data,
                                         Locale locale,
                                         ControlTextDirection direction,
                                         AssetCollector assets) {
@@ -211,6 +220,85 @@ public class WorkflowDefinitionController {
         control.step = modelText(spec.model(), "step", control.step);
         control.renderFragment = trim(spec.fragmentName());
         control.renderModel = new LinkedHashMap<>(spec.model());
+    }
+
+    private void applyControlValue(RenderedControl control, JsonNode node, JsonNode data) {
+        if (control == null || node == null || !node.isObject()) {
+            return;
+        }
+
+        String stateKey = trim(control.stateKey);
+        if (stateKey.isEmpty()) {
+            return;
+        }
+
+        JsonNode valueNode = resolveDataValue(data, stateKey);
+        if (valueNode == null || valueNode.isMissingNode() || valueNode.isNull()) {
+            return;
+        }
+
+        String value = scalarText(valueNode);
+        if (value.isEmpty()) {
+            return;
+        }
+
+        if (control.renderModel == null || control.renderModel.isEmpty()) {
+            control.renderModel = new LinkedHashMap<>();
+        }
+
+        if (!control.renderModel.containsKey("value") || control.renderModel.get("value") == null) {
+            if ("datetime".equals(control.widget) || "datetime-local".equals(control.inputType)) {
+                control.renderModel.put("value", toClientDateTimeValue(value));
+            } else {
+                control.renderModel.put("value", value);
+            }
+        }
+    }
+
+    private JsonNode resolveDataValue(JsonNode data, String stateKey) {
+        if (data == null || data.isNull() || !data.isObject() || stateKey == null) {
+            return null;
+        }
+
+        JsonNode current = data;
+        String[] parts = stateKey.split("\\.");
+        for (String part : parts) {
+            String key = trim(part);
+            if (key.isEmpty()) {
+                return null;
+            }
+
+            if (!current.isObject()) {
+                return null;
+            }
+            current = current.get(key);
+            if (current == null) {
+                return null;
+            }
+        }
+
+        return current;
+    }
+
+    private String toClientDateTimeValue(String rawValue) {
+        String text = trim(rawValue);
+        if (text.isEmpty()) {
+            return "";
+        }
+
+        DateTimeFormatter targetFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+        try {
+            if (text.endsWith("Z") || text.matches(".*[+-]\\d{2}:?\\d{2}$")) {
+                return OffsetDateTime.parse(text).atZoneSameInstant(ZoneId.systemDefault()).format(targetFormatter);
+            }
+            try {
+                return LocalDateTime.parse(text).format(targetFormatter);
+            } catch (RuntimeException ignored) {
+                return Instant.parse(text).atZone(ZoneId.systemDefault()).format(targetFormatter);
+            }
+        } catch (RuntimeException ex) {
+            return text;
+        }
     }
 
     private static final class AssetCollector {
