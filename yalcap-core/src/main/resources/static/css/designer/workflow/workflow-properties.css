@@ -1,0 +1,47 @@
+.step-hint {
+    margin-top: 8px;
+    margin-bottom: 6px;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #1e3a8a;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 10px;
+}
+
+label {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #344054;
+}
+
+input,
+select,
+textarea,
+button {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccd5e3;
+    border-radius: 8px;
+    padding: 8px;
+    font: inherit;
+}
+
+textarea {
+    font-family: Consolas, monospace;
+}
+
+button {
+    cursor: pointer;
+    background: #0e5aa7;
+    color: #fff;
+    border: none;
+    margin-top: 10px;
+}
+
+button.danger {
+    background: #b42318;
+}

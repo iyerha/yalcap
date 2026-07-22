@@ -1,0 +1,19 @@
+.palette-item--service .palette-icon {
+    background: #ecfdf3;
+    color: #067647;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--service {
+    border-color: #8fd1b3;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--service .node-shell {
+    background: linear-gradient(180deg, #f5fdf8 0%, #eaf9f0 100%);
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--service .node-type {
+    color: #065f46;
+    background: #d1fae5;
+}

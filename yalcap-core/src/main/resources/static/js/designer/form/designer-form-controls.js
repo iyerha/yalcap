@@ -35,6 +35,31 @@
             return widget === 'button';
         },
 
+        newControlPersistentId() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+
+            const seed = `${Date.now()}-${Math.random()}-${Math.random()}`;
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+                const code = (seed.charCodeAt(Math.floor(Math.random() * seed.length)) + Math.floor(Math.random() * 16)) % 16;
+                const value = ch === 'x' ? code : ((code & 0x3) | 0x8);
+                return value.toString(16);
+            });
+        },
+
+        isGuid(value) {
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+        },
+
+        ensureControlId(value) {
+            const candidate = String(value || '').trim();
+            if (this.isGuid(candidate)) {
+                return candidate.toLowerCase();
+            }
+            return this.newControlPersistentId();
+        },
+
         getControlDesignerHooks(widget) {
             const key = String(widget || '').trim().toLowerCase();
             if (!key) {
@@ -385,7 +410,7 @@
             return /^[A-Za-z][A-Za-z0-9_.-]*$/.test((value || '').trim());
         },
 
-        countStateKeyUsage(stateKey, excludeControlId = null, controls = this.controls) {
+        countStateKeyUsage(stateKey, excludeControlLocalId = null, controls = this.controls) {
             const target = (stateKey || '').trim().toLowerCase();
             if (!target || !Array.isArray(controls)) {
                 return 0;
@@ -398,7 +423,7 @@
                         return;
                     }
                     const itemKey = (item.stateKey || '').trim().toLowerCase();
-                    if (itemKey === target && (!excludeControlId || item.id !== excludeControlId)) {
+                    if (itemKey === target && (!excludeControlLocalId || item.localId !== excludeControlLocalId)) {
                         count += 1;
                     }
                     if (Array.isArray(item.children) && item.children.length > 0) {
@@ -462,7 +487,9 @@
                 normalized.options = [];
             }
 
+            normalized.localId = String(normalized.localId || (typeof this.newControlLocalId === 'function' ? this.newControlLocalId() : 'ctrl-fallback')).trim();
             normalized.nameManual = normalized.nameManual === true;
+            normalized.id = this.ensureControlId(normalized.id);
             normalized.name = this.toIdentifier(normalized.name || normalized.label || 'field');
             normalized.stateKey = (normalized.stateKey || '').trim();
             normalized.visible = normalized.visible !== false;
@@ -784,7 +811,7 @@
             }
 
             const normalized = this.normalizeControl(control);
-            if (normalized.stateKey && this.countStateKeyUsage(normalized.stateKey, normalized.id || null) > 0) {
+            if (normalized.stateKey && this.countStateKeyUsage(normalized.stateKey, normalized.localId || null) > 0) {
                 errs.push('State key must be unique across all controls.');
             }
             const options = Array.isArray(normalized.options) ? normalized.options : [];

@@ -1,32 +1,27 @@
 window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixin(target) {
     Object.assign(target, {
         selectedStepDraft: null,
-        decisionConditionError: '',
+        selectedStepHint: '',
+        configFieldErrors: {},
 
         refreshSelectedStepView() {
             const selectedId = String(this.selectedNodeId || '').trim();
             if (!selectedId) {
                 this.selectedStepDraft = null;
-                this.decisionConditionError = '';
+                this.selectedStepHint = '';
+                this.configFieldErrors = {};
                 return;
             }
             const sourceStep = this.findSelectedStep(selectedId);
-            this.decisionConditionError = '';
+            this.selectedStepHint = '';
+            this.configFieldErrors = {};
             this.selectedStepDraft = sourceStep ? {
                 id: sourceStep.id,
                 title: sourceStep.title,
                 type: sourceStep.type,
-                assignee: {
-                    kind: sourceStep.assignee.kind,
-                    value: sourceStep.assignee.value
-                },
+                config: JSON.parse(JSON.stringify(sourceStep.config || {})),
                 next: sourceStep.next,
                 transitions: Object.assign({}, sourceStep.transitions || {}),
-                transitionLabels: {
-                    output_1: String((sourceStep.transitionLabels && sourceStep.transitionLabels.output_1) || '').trim(),
-                    output_2: String((sourceStep.transitionLabels && sourceStep.transitionLabels.output_2) || '').trim()
-                },
-                conditionJson: sourceStep.condition ? JSON.stringify(sourceStep.condition, null, 2) : '',
                 designer: {
                     position: {
                         x: Number(sourceStep.designer && sourceStep.designer.position && sourceStep.designer.position.x) || 0,
@@ -35,6 +30,17 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
                 },
                 nodeId: sourceStep.nodeId
             } : null;
+
+            if (this.selectedStepDraft) {
+                this.invokeStepHook(this.selectedStepDraft.type, 'onSelect', {
+                    step: sourceStep,
+                    draft: this.selectedStepDraft,
+                    setHint: (hint) => {
+                        this.selectedStepHint = String(hint || '').trim();
+                    },
+                    sync: () => this.syncSelectedStep()
+                });
+            }
         },
 
         normalizeNodeId(nodeId) {
@@ -67,31 +73,91 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             this.propertiesCollapsed = !this.propertiesCollapsed;
         },
 
-        normalizeDecisionCondition(raw) {
-            const text = String(raw || '').trim();
-            if (!text) {
+        getSelectedStepConfigFields() {
+            const selectedType = this.selectedStepDraft ? this.selectedStepDraft.type : null;
+            const descriptor = this.getStepTypeDescriptor(selectedType);
+            const schema = descriptor && descriptor.configSchema && typeof descriptor.configSchema === 'object'
+                ? descriptor.configSchema
+                : {};
+            const properties = schema && schema.properties && typeof schema.properties === 'object'
+                ? schema.properties
+                : {};
+
+            return Object.keys(properties).map((key) => {
+                const raw = properties[key] || {};
+                return {
+                    key: key,
+                    title: String(raw.title || key),
+                    type: String(raw.type || 'string'),
+                    format: String(raw.format || '').trim(),
+                    placeholder: String(raw.placeholder || '').trim(),
+                    enumValues: Array.isArray(raw.enum) ? raw.enum.map((value) => String(value)) : []
+                };
+            });
+        },
+
+        getSelectedStepOutputCount() {
+            const selectedType = this.selectedStepDraft ? this.selectedStepDraft.type : null;
+            return this.getStepTypeOutputCount(selectedType);
+        },
+
+        getSelectedStepOutputIndices() {
+            const outputCount = this.getSelectedStepOutputCount();
+            return Array.from({ length: outputCount }, function (_, index) {
+                return index + 1;
+            });
+        },
+
+        getSelectedStepConfigValue(key) {
+            if (!this.selectedStepDraft || !this.selectedStepDraft.config) {
+                return '';
+            }
+            const value = this.selectedStepDraft.config[key];
+            return value == null ? '' : String(value);
+        },
+
+        normalizeJsonConfig(text) {
+            const trimmed = String(text || '').trim();
+            if (!trimmed) {
                 return null;
             }
 
-            const parsed = JSON.parse(text);
+            const parsed = JSON.parse(trimmed);
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                throw new Error('Condition must be a JSON object');
+                throw new Error('Value must be a JSON object');
             }
-
             return parsed;
         },
 
-        cleanTransitionLabels(labels) {
-            const cleaned = {};
-            ['output_1', 'output_2'].forEach((key, index) => {
-                const value = String(labels && labels[key] || '').trim();
-                if (value) {
-                    cleaned[key] = value;
-                    return;
+        updateSelectedStepConfig(field, value) {
+            if (!this.selectedStepDraft) {
+                return;
+            }
+
+            const key = String(field && field.key || '').trim();
+            if (!key) {
+                return;
+            }
+
+            if (!this.selectedStepDraft.config || typeof this.selectedStepDraft.config !== 'object') {
+                this.selectedStepDraft.config = {};
+            }
+
+            const rawValue = value == null ? '' : String(value);
+            this.selectedStepDraft.config[key] = rawValue;
+
+            if (String(field && field.format || '').trim() === 'json') {
+                try {
+                    this.normalizeJsonConfig(rawValue);
+                    delete this.configFieldErrors[key];
+                } catch (err) {
+                    this.configFieldErrors[key] = err instanceof Error ? err.message : String(err);
                 }
-                cleaned[key] = 'Action ' + (index + 1);
-            });
-            return cleaned;
+            } else {
+                delete this.configFieldErrors[key];
+            }
+
+            this.syncSelectedStep();
         },
 
         syncSelectedStep() {
@@ -107,39 +173,65 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
 
             const previousType = sourceStep.type;
             const typeChanged = String(previousType || '').trim() !== String(draft.type || '').trim();
-            const isDecision = String(draft.type || '').trim() === 'decision';
-            let normalizedCondition = null;
 
-            if (isDecision) {
-                try {
-                    normalizedCondition = this.normalizeDecisionCondition(draft.conditionJson);
-                    this.decisionConditionError = '';
-                } catch (err) {
-                    this.decisionConditionError = err instanceof Error ? err.message : String(err);
-                    return;
-                }
-            } else {
-                this.decisionConditionError = '';
+            if (typeChanged) {
+                draft.config = this.getStepTypeConfigDefaults(draft.type);
+                this.configFieldErrors = {};
+            }
+
+            if (Object.keys(this.configFieldErrors).length > 0) {
+                return;
             }
 
             sourceStep.id = draft.id;
             sourceStep.title = draft.title;
             sourceStep.type = draft.type;
+
+            sourceStep.config = JSON.parse(JSON.stringify(draft.config || {}));
+
             if (String(draft.type || '').trim() === 'form') {
-                sourceStep.assignee.kind = draft.assignee.kind;
-                sourceStep.assignee.value = draft.assignee.value;
+                sourceStep.assignee.kind = String(sourceStep.config.assigneeKind || 'INTERNAL_USER').trim();
+                sourceStep.assignee.value = String(sourceStep.config.assigneeValue || '').trim();
             } else {
                 sourceStep.assignee.kind = 'INTERNAL_USER';
                 sourceStep.assignee.value = '';
             }
+
             sourceStep.next = draft.next;
             sourceStep.transitions = Object.assign({}, draft.transitions || sourceStep.transitions || {});
-            sourceStep.transitionLabels = isDecision ? this.cleanTransitionLabels(draft.transitionLabels) : {};
-            sourceStep.condition = isDecision ? normalizedCondition : null;
+
+            const outputCount = this.getStepTypeOutputCount(draft.type);
+            if (outputCount > 1) {
+                const labels = {};
+                for (let outputIndex = 1; outputIndex <= outputCount; outputIndex += 1) {
+                    const configKey = 'action' + outputIndex + 'Label';
+                    const label = String(sourceStep.config[configKey] || '').trim();
+                    labels['output_' + outputIndex] = label || ('Action ' + outputIndex);
+                }
+                sourceStep.transitionLabels = labels;
+
+                try {
+                    sourceStep.condition = this.normalizeJsonConfig(sourceStep.config.conditionJson);
+                } catch (_) {
+                    sourceStep.condition = null;
+                }
+            } else {
+                sourceStep.transitionLabels = {};
+                sourceStep.condition = null;
+            }
+
             sourceStep.designer.position = {
                 x: Number(draft.designer && draft.designer.position && draft.designer.position.x) || 0,
                 y: Number(draft.designer && draft.designer.position && draft.designer.position.y) || 0
             };
+
+            this.invokeStepHook(sourceStep.type, 'afterSync', {
+                step: sourceStep,
+                draft: draft,
+                setHint: (hint) => {
+                    this.selectedStepHint = String(hint || '').trim();
+                }
+            });
 
             if (this.useFallbackCanvas) {
                 this.generate();

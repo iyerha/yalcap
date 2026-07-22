@@ -13,7 +13,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +61,8 @@ class FormDefinitionServiceTest {
         FormDefinitionEntity published = service.publish("sample-form", definition, "tester", "add widgets");
 
         assertEquals("sample-form", published.getFormKey());
-        assertEquals(definition, published.getDefinition());
+        assertEquals("date", published.getDefinition().path("form").path("controlSchema").path("layout").get(0).path("widget").asString());
+        assertFalse(published.getDefinition().path("form").path("controlSchema").path("layout").get(0).path("id").asString("").isBlank());
     }
 
     @Test
@@ -155,5 +158,70 @@ class FormDefinitionServiceTest {
                 () -> service.publish("sample-form", definition, "tester", "invalid remote autocomplete"));
 
         assertEquals("form.controlSchema.layout[0].autocompleteSourceUrl is required for remote autocomplete widget", ex.getMessage());
+    }
+
+    @Test
+    void publish_assignsMissingControlIdsAndKeepsExistingId() throws Exception {
+        when(repository.findByFormKeyAndActiveTrue("sample-form")).thenReturn(Optional.empty());
+        when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        String existingGuid = "11111111-1111-4111-8111-111111111111";
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "kind": "form",
+                  "form": {
+                    "dataSchema": {
+                      "type": "object",
+                      "properties": {
+                        "a": {"type": "string"},
+                        "b": {"type": "string"}
+                      }
+                    },
+                    "controlSchema": {
+                      "layout": [
+                        {"pointer": "#/properties/a", "stateKey": "a", "widget": "text", "label": "A", "id": "11111111-1111-4111-8111-111111111111"},
+                        {"pointer": "#/properties/b", "stateKey": "b", "widget": "text", "label": "B"}
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        FormDefinitionEntity published = service.publish("sample-form", definition, "tester", "guid coverage");
+        JsonNode layout = published.getDefinition().path("form").path("controlSchema").path("layout");
+
+        assertEquals(existingGuid, layout.get(0).path("id").asString());
+        assertTrue(layout.get(1).has("id"));
+        assertFalse(layout.get(1).path("id").asString("").isBlank());
+        assertFalse(layout.get(0).path("id").asString().equalsIgnoreCase(layout.get(1).path("id").asString()));
+    }
+
+    @Test
+    void publish_rejectsDuplicateControlId() throws Exception {
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "kind": "form",
+                  "form": {
+                    "dataSchema": {
+                      "type": "object",
+                      "properties": {
+                        "a": {"type": "string"},
+                        "b": {"type": "string"}
+                      }
+                    },
+                    "controlSchema": {
+                      "layout": [
+                        {"pointer": "#/properties/a", "stateKey": "a", "widget": "text", "label": "A", "id": "11111111-1111-4111-8111-111111111111"},
+                        {"pointer": "#/properties/b", "stateKey": "b", "widget": "text", "label": "B", "id": "11111111-1111-4111-8111-111111111111"}
+                      ]
+                    }
+                  }
+                }
+                """);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.publish("sample-form", definition, "tester", "dup guid"));
+
+        assertEquals("form.controlSchema.layout[1].id must be unique", ex.getMessage());
     }
 }

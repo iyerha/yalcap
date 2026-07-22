@@ -45,7 +45,7 @@ function formDesigner() {
         ],
         controls: [],
         columnOptions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        selectedControlId: null,
+        selectedControlLocalId: null,
         selectedControl: null,
         stateKeyEditEnabled: false,
         lastSelectedAt: 0,
@@ -267,12 +267,12 @@ function formDesigner() {
             return icons[widget] || icons.text;
         },
 
-        removeControl(id, event) {
+        removeControl(localId, event) {
             if (!event || !event.target || !event.target.closest || !event.target.closest('.remove-control-btn')) {
                 return;
             }
 
-            if (this.selectedControlId === id && (Date.now() - this.lastSelectedAt) < 300) {
+            if (this.selectedControlLocalId === localId && (Date.now() - this.lastSelectedAt) < 300) {
                 return;
             }
 
@@ -280,13 +280,13 @@ function formDesigner() {
                 return;
             }
 
-            const found = this.findControlById(id);
+            const found = this.findControlByLocalId(localId);
             if (found) {
                 found.list.splice(found.index, 1);
                 this.recomputeDerivedStateKeys();
             }
-            if (this.selectedControlId === id) {
-                this.selectedControlId = null;
+            if (this.selectedControlLocalId === localId) {
+                this.selectedControlLocalId = null;
                 this.selectedControl = null;
             }
         },
@@ -391,6 +391,35 @@ function formDesigner() {
                     const actions = Array.isArray(rule.actions) ? rule.actions : [];
                     actions.forEach((action) => {
                         const kind = String(action?.kind || '').trim().toLowerCase();
+                        if (kind === 'derive' || kind === 'set' || action?.effect === 'derive') {
+                            const target = String(action?.target || '').trim();
+                            if (!target) {
+                                return;
+                            }
+                            let expressionText = '';
+                            if (typeof action?.expression === 'string') {
+                                expressionText = action.expression;
+                            } else if (action?.expression !== undefined && action?.expression !== null) {
+                                try {
+                                    expressionText = JSON.stringify(action.expression);
+                                } catch (_err) {
+                                    expressionText = String(action.expression);
+                                }
+                            }
+                            const key = `derive::${target}::${expressionText}`;
+                            if (actionMap.has(key)) {
+                                return;
+                            }
+                            const column = this.newDecisionActionColumn({
+                                kind: 'derive',
+                                deriveTarget: target,
+                                deriveExpression: expressionText
+                            });
+                            actionMap.set(key, column.id);
+                            actionColumns.push(column);
+                            return;
+                        }
+
                         if (kind === 'api' || action?.endpoint) {
                             const endpoint = String(action?.endpoint || '').trim();
                             if (!endpoint) {
@@ -446,6 +475,7 @@ function formDesigner() {
                 }
 
                 table.rules.forEach((rule) => {
+                    rule.runOnInit = rule.runOnInit === true;
                     rule.decisionInputs = {};
                     rule.decisionActions = {};
 
@@ -482,6 +512,30 @@ function formDesigner() {
                     const actions = Array.isArray(rule.actions) ? rule.actions : [];
                     actions.forEach((action) => {
                         const kind = String(action?.kind || '').trim().toLowerCase();
+                        if (kind === 'derive' || kind === 'set' || action?.effect === 'derive') {
+                            const target = String(action?.target || '').trim();
+                            if (!target) {
+                                return;
+                            }
+                            let expressionText = '';
+                            if (typeof action?.expression === 'string') {
+                                expressionText = action.expression;
+                            } else if (action?.expression !== undefined && action?.expression !== null) {
+                                try {
+                                    expressionText = JSON.stringify(action.expression);
+                                } catch (_err) {
+                                    expressionText = String(action.expression);
+                                }
+                            }
+                            const key = `derive::${target}::${expressionText}`;
+                            const columnId = actionMap.get(key);
+                            if (!columnId) {
+                                return;
+                            }
+                            rule.decisionActions[columnId] = 'true';
+                            return;
+                        }
+
                         if (kind === 'api' || action?.endpoint) {
                             const endpoint = String(action?.endpoint || '').trim();
                             if (!endpoint) {
@@ -525,6 +579,30 @@ function formDesigner() {
                     ? rule.actions
                         .map((action) => {
                             const kind = String(action?.kind || '').trim().toLowerCase();
+                            if (kind === 'derive' || kind === 'set' || action?.effect === 'derive') {
+                                const target = String(action?.target || '').trim();
+                                if (!target) {
+                                    return null;
+                                }
+
+                                let expression = '';
+                                if (typeof action?.expression === 'string') {
+                                    expression = action.expression;
+                                } else if (action?.expression !== undefined && action?.expression !== null) {
+                                    try {
+                                        expression = JSON.stringify(action.expression);
+                                    } catch (_err) {
+                                        expression = String(action.expression);
+                                    }
+                                }
+
+                                return {
+                                    kind: 'derive',
+                                    target,
+                                    expression
+                                };
+                            }
+
                             if (kind === 'api' || action?.endpoint) {
                                 const endpoint = String(action?.endpoint || '').trim();
                                 if (!endpoint) {
@@ -562,6 +640,7 @@ function formDesigner() {
                 const base = {
                     id: String(rule.id || `rule-${index + 1}`),
                     scope: String(rule.scope || 'form'),
+                    runOnInit: rule.runOnInit === true,
                     conditionMatchMode: 'all',
                     actions: hydratedActions.length > 0
                         ? hydratedActions
@@ -639,7 +718,8 @@ function formDesigner() {
                 const inferredWidget = this.inferHydratedWidget(item);
                 const name = this.pointerLeafName(item.pointer || '', index);
                 const base = {
-                    id: this.newControlId(),
+                    localId: this.newControlLocalId(),
+                    id: this.ensureControlId(item.id),
                     name,
                     stateKey: String(item.stateKey || name),
                     label: String(item.label || name),

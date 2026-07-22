@@ -54,6 +54,25 @@
                                 return apiAction;
                             }
 
+                            if (kind === 'derive') {
+                                const target = String(action?.target || '').trim();
+                                if (!target) {
+                                    return null;
+                                }
+
+                                const expression = action?.expression;
+                                if (expression === null || expression === undefined) {
+                                    return null;
+                                }
+
+                                return {
+                                    kind: 'derive',
+                                    effect: 'set',
+                                    target,
+                                    expression
+                                };
+                            }
+
                             return {
                                 kind: 'ui',
                                 target: String(action?.target || '').trim(),
@@ -65,6 +84,9 @@
                             if (action.kind === 'api') {
                                 return !!action.endpoint;
                             }
+                            if (action.kind === 'derive') {
+                                return !!action.target && action.expression !== null && action.expression !== undefined;
+                            }
                             return !!action.target && !!action.effect;
                         });
 
@@ -75,6 +97,7 @@
                     const normalized = {
                         id: String(rule.id || '').trim() || `${table.id}-rule-${index + 1}`,
                         scope,
+                        runOnInit: rule.runOnInit === true,
                         actions: normalizedActions
                     };
 

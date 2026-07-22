@@ -1,0 +1,18 @@
+.palette-item--form .palette-icon {
+    background: #f2f4f7;
+    color: #344054;
+    font-weight: 700;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--form {
+    border-color: #a5b4c9;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--form .node-shell {
+    background: #e9eef7;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--form .node-type {
+    color: #23324a;
+    background: #d2dceb;
+}

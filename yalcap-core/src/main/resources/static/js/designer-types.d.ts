@@ -4,6 +4,7 @@ declare global {
   type AnyRecord = Record<string, any>;
 
   interface DesignerBaseControl {
+    localId?: string;
     id?: string;
     name: string;
     label: string;
@@ -76,6 +77,7 @@ declare global {
     schemaRequired: string[];
     layoutTarget: Array<Record<string, any>>;
     pointerBase: string;
+    newControlId?: () => string;
   }
 
   type SchemaEmitter = (ctx: SchemaEmitterContext) => boolean;

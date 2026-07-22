@@ -1,0 +1,38 @@
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision {
+    border-color: #2459a6;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision .node-shell {
+    background: #d9e9ff;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision .node-type {
+    color: #ffffff;
+    background: #2a5da8;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision .node-type::before {
+    content: '◆ ';
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision .output {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #0e5aa7;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision .output.output_1::after {
+    content: '1';
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision .output.output_2::after {
+    content: '2';
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node--decision.selected {
+    border-color: #0e5aa7;
+    box-shadow: 0 0 0 2px #dbeafe;
+}

@@ -274,6 +274,12 @@ class WorkflowDefinitionControllerTest {
         @SuppressWarnings("unchecked")
         List<String> runtimeJsAssets = (List<String>) runtimeJsAssetsValue;
         assertTrue(runtimeJsAssets.contains("/js/runtime/runtime-repeats.js"));
+
+                Object runtimeCssAssetsValue = model.asMap().get("runtimeCssAssets");
+                assertInstanceOf(List.class, runtimeCssAssetsValue);
+                @SuppressWarnings("unchecked")
+                List<String> runtimeCssAssets = (List<String>) runtimeCssAssetsValue;
+                assertTrue(runtimeCssAssets.contains("/css/runtime/runtime-print.css"));
     }
 
                 @Test

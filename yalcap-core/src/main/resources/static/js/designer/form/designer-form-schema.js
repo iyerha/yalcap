@@ -6,7 +6,7 @@
 
     windowAny.formDesignerSchema = {
         generate() {
-            const previousSelection = this.selectedControlId;
+            const previousSelection = this.selectedControlLocalId;
             const allErrors = [];
             const walkControls = (controls) => {
                 controls.forEach((c) => {
@@ -51,7 +51,8 @@
                             schemaProperties,
                             schemaRequired,
                             layoutTarget,
-                            pointerBase
+                            pointerBase,
+                            newControlId: this.newControlPersistentId.bind(this)
                         });
                         if (handled) {
                             return;
@@ -106,6 +107,7 @@
                     }
 
                     layoutTarget.push({
+                        id: c.id,
                         pointer: `${pointerBase}/properties/${c.name}`,
                         stateKey: c.stateKey || c.name,
                         widget: c.widget,

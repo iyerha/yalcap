@@ -1,16 +1,21 @@
 package com.yalcap.definition.workflow;
 
 import com.yalcap.definition.form.load.FormLoadDataContext;
-import com.yalcap.definition.form.load.FormLoadDataHydrationService;
+import com.yalcap.definition.form.load.FormLoadDataService;
 import com.yalcap.definition.form.load.FormLoadDataPhase;
 import com.yalcap.definition.form.FormDefinitionEntity;
 import com.yalcap.definition.form.FormDefinitionRepository;
+import com.yalcap.definition.workflow.step.StepType;
+import com.yalcap.definition.workflow.step.StepTypeRegistry;
+import com.yalcap.definition.workflow.step.StepTypeValidationContext;
+import com.yalcap.definition.workflow.step.StepTypeValidationErrors;
 import com.yalcap.persistence.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.NullNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
@@ -28,9 +33,6 @@ import java.util.regex.Pattern;
 public class WorkflowDefinitionService {
 
     private static final Set<String> ALLOWED_THEME_PRESETS = Set.of("default", "slate", "sunrise", "custom");
-        private static final Set<String> JSON_LOGIC_OPERATORS = Set.of(
-            "var", "==", "!=", ">", ">=", "<", "<=", "in", "and", "or", "!", "matches"
-        );
     private static final Set<String> ALLOWED_API_METHODS = Set.of("get", "post", "put", "patch", "delete");
     private static final Set<String> ALLOWED_API_TRIGGERS = Set.of("change", "input", "blur", "submit", "click");
     private static final Set<String> ALLOWED_API_SWAPS = Set.of("innerHTML", "outerHTML", "beforeend", "afterend");
@@ -41,18 +43,24 @@ public class WorkflowDefinitionService {
     private final WorkflowDefinitionRepository repository;
     private final FormDefinitionRepository formDefinitionRepository;
     private final com.yalcap.asset.AssetFileRepository assetFileRepository;
-    private final FormLoadDataHydrationService formLoadDataHydrationService;
+    private final FormLoadDataService formLoadDataHydrationService;
+    private final StepTypeRegistry stepTypeRegistry;
+    private final WorkflowRuleEngine workflowRuleEngine;
     private final ObjectMapper objectMapper;
 
     public WorkflowDefinitionService(WorkflowDefinitionRepository repository,
                                    FormDefinitionRepository formDefinitionRepository,
                                    com.yalcap.asset.AssetFileRepository assetFileRepository,
-                                   FormLoadDataHydrationService formLoadDataHydrationService,
+                                   FormLoadDataService formLoadDataHydrationService,
+                                   StepTypeRegistry stepTypeRegistry,
+                                   WorkflowRuleEngine workflowRuleEngine,
                                    ObjectMapper objectMapper) {
         this.repository = repository;
         this.formDefinitionRepository = formDefinitionRepository;
         this.assetFileRepository = assetFileRepository;
         this.formLoadDataHydrationService = formLoadDataHydrationService;
+        this.stepTypeRegistry = stepTypeRegistry;
+        this.workflowRuleEngine = workflowRuleEngine;
         this.objectMapper = objectMapper;
     }
 
@@ -74,6 +82,7 @@ public class WorkflowDefinitionService {
         private String userId;
         private List<String> userGroups;
         private JsonNode data;
+        private Boolean formInitialization;
 
         public String getStepId() {
             return stepId;
@@ -106,6 +115,14 @@ public class WorkflowDefinitionService {
         public void setData(JsonNode data) {
             this.data = data;
         }
+
+        public Boolean getFormInitialization() {
+            return formInitialization;
+        }
+
+        public void setFormInitialization(Boolean formInitialization) {
+            this.formInitialization = formInitialization;
+        }
     }
 
     @Transactional
@@ -115,6 +132,7 @@ public class WorkflowDefinitionService {
                                            String changeMessage) {
         JsonNode preparedDefinition = prepareDefinition(definition);
         validateTheme(preparedDefinition);
+        validateStepDefinitions(preparedDefinition);
         validateAndNormalizeRuleActions(preparedDefinition);
 
         Optional<WorkflowDefinitionEntity> activeDefinition = repository.findByDefinitionKeyAndActiveTrue(definitionKey);
@@ -176,6 +194,39 @@ public class WorkflowDefinitionService {
         enrichImageControlsInLayout((ArrayNode) layout, "formSnapshot.controlSchema.layout");
 
         return snapshot;
+    }
+
+    private void validateStepDefinitions(JsonNode definition) {
+        if (definition == null || !definition.isObject()) {
+            return;
+        }
+
+        JsonNode stepsNode = definition.path("steps");
+        if (!stepsNode.isArray()) {
+            return;
+        }
+
+        for (int i = 0; i < stepsNode.size(); i += 1) {
+            JsonNode stepNode = stepsNode.get(i);
+            if (stepNode == null || !stepNode.isObject()) {
+                continue;
+            }
+
+            String stepPath = "steps[" + i + "]";
+            String stepTypeKey = safeString(stepNode.path("type").asString());
+            if (stepTypeKey.isEmpty()) {
+                throw new IllegalArgumentException(stepPath + ".type is required");
+            }
+
+            StepType stepType = stepTypeRegistry.find(stepTypeKey)
+                    .orElseThrow(() -> new IllegalArgumentException(stepPath + ".type is not registered: " + stepTypeKey));
+
+            StepTypeValidationErrors errors = new StepTypeValidationErrors();
+            stepType.validate(new StepTypeValidationContext(stepNode, stepPath, errors));
+            if (errors.hasErrors()) {
+                throw new IllegalArgumentException(String.join("; ", errors.all()));
+            }
+        }
     }
 
     private void validateRuntimeControlRulesInLayout(ArrayNode layoutArray, String contextPath) {
@@ -474,7 +525,7 @@ public class WorkflowDefinitionService {
 
         ObjectNode definitionCopy = ((ObjectNode) definition).deepCopy();
         ObjectNode inputData = asObjectNode(request != null ? request.getData() : null);
-        ObjectNode hydratedData = formLoadDataHydrationService.hydrate(new FormLoadDataContext(
+        ObjectNode hydratedData = formLoadDataHydrationService.load(new FormLoadDataContext(
             safeString(definitionEntity.getDefinitionKey()),
             request != null ? safeString(request.getStepId()) : "",
             request != null ? safeString(request.getUserId()) : "",
@@ -485,11 +536,16 @@ public class WorkflowDefinitionService {
         ));
         ObjectNode mergedData = mergeData(inputData, hydratedData);
         ObjectNode context = buildRuleContext(definitionEntity, request, mergedData);
+        boolean initializationPhase = isInitializationPhase(request);
 
-        Map<String, RuleEffectState> formRuleState = evaluateRules(definitionCopy.path("rules"), "form", context);
-        Map<String, RuleEffectState> stepRuleState = evaluateRules(definitionCopy.path("rules"), "step", context);
-        ArrayNode formApiActions = evaluateApiActions(definitionCopy.path("rules"), "form", context);
-        ArrayNode stepApiActions = evaluateApiActions(definitionCopy.path("rules"), "step", context);
+        // Apply value-derivation actions first so subsequent rules can reference derived data.* facts.
+        workflowRuleEngine.applyDerivedValueRules(definitionCopy.path("rules"), "form", context, mergedData, initializationPhase);
+        workflowRuleEngine.applyDerivedValueRules(definitionCopy.path("rules"), "step", context, mergedData, initializationPhase);
+
+        Map<String, WorkflowRuleEngine.RuleEffectState> formRuleState = workflowRuleEngine.evaluateRules(definitionCopy.path("rules"), "form", context, initializationPhase);
+        Map<String, WorkflowRuleEngine.RuleEffectState> stepRuleState = workflowRuleEngine.evaluateRules(definitionCopy.path("rules"), "step", context, initializationPhase);
+        ArrayNode formApiActions = evaluateApiActions(definitionCopy.path("rules"), "form", context, initializationPhase);
+        ArrayNode stepApiActions = evaluateApiActions(definitionCopy.path("rules"), "step", context, initializationPhase);
         Map<String, ObjectNode> formHtmxByTarget = buildHtmxAttributesByTarget(formApiActions);
         Map<String, ObjectNode> stepHtmxByTarget = buildHtmxAttributesByTarget(stepApiActions);
 
@@ -578,7 +634,8 @@ public class WorkflowDefinitionService {
 
     private ArrayNode evaluateApiActions(JsonNode rulesNode,
                                          String scope,
-                                         ObjectNode context) {
+                                         ObjectNode context,
+                                         boolean initializationPhase) {
         ArrayNode out = objectMapper.createArrayNode();
         if (!rulesNode.isArray()) {
             return out;
@@ -595,9 +652,12 @@ public class WorkflowDefinitionService {
             if (!scope.equals(ruleScope)) {
                 continue;
             }
+            if (!workflowRuleEngine.shouldEvaluateRuleForPhase(rule, initializationPhase)) {
+                continue;
+            }
 
             JsonNode when = rule.path("when");
-            if (!evaluateCondition(when, context)) {
+            if (!workflowRuleEngine.evaluateCondition(when, context)) {
                 continue;
             }
 
@@ -796,428 +856,14 @@ public class WorkflowDefinitionService {
         return merged;
     }
 
-    private Map<String, RuleEffectState> evaluateRules(JsonNode rulesNode,
-                                                       String scope,
-                                                       ObjectNode context) {
-        Map<String, RuleEffectState> targetState = new HashMap<>();
-        if (!rulesNode.isArray()) {
-            return targetState;
-        }
-
-        for (JsonNode rule : rulesNode) {
-            if (rule == null || !rule.isObject()) {
-                continue;
-            }
-            String ruleScope = safeString(rule.path("scope").asString());
-            if (!scope.equals(ruleScope)) {
-                continue;
-            }
-
-            JsonNode when = rule.path("when");
-            if (!evaluateCondition(when, context)) {
-                continue;
-            }
-
-            JsonNode actions = rule.path("actions");
-            if (actions.isArray() && actions.size() > 0) {
-                for (JsonNode action : actions) {
-                    applyRuleAction(targetState, action);
-                }
-                continue;
-            }
-
-            applyRuleAction(targetState, rule);
-        }
-
-        return targetState;
-    }
-
-    private void applyRuleAction(Map<String, RuleEffectState> targetState, JsonNode actionNode) {
-        if (actionNode == null || !actionNode.isObject()) {
-            return;
-        }
-
-        String target = safeString(actionNode.path("target").asString());
-        String effect = safeString(actionNode.path("effect").asString());
-        if (target.isEmpty() || effect.isEmpty()) {
-            return;
-        }
-
-        RuleEffectState state = targetState.computeIfAbsent(target, ignored -> new RuleEffectState());
-        if ("collapse".equals(effect)) {
-            state.applyCollapsed(true);
-            return;
-        }
-        if ("expand".equals(effect)) {
-            state.applyCollapsed(false);
-            return;
-        }
-
-        boolean value = actionNode.path("value").asBoolean(false);
-        state.apply(effect, value);
-    }
-
-    private boolean evaluateCondition(JsonNode condition, ObjectNode context) {
-        if (condition == null || condition.isNull() || condition.isMissingNode()) {
-            return true;
-        }
-
-        if (isJsonLogicCondition(condition)) {
-            JsonNode evaluated = evaluateJsonLogic(condition, context);
-            return isTruthy(evaluated);
-        }
-
-        JsonNode all = condition.get("all");
-        if (all != null && all.isArray()) {
-            for (JsonNode child : all) {
-                if (!evaluateCondition(child, context)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        JsonNode any = condition.get("any");
-        if (any != null && any.isArray()) {
-            for (JsonNode child : any) {
-                if (evaluateCondition(child, context)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        JsonNode not = condition.get("not");
-        if (not != null && !not.isNull()) {
-            return !evaluateCondition(not, context);
-        }
-
-        return evaluateLeafCondition(condition, context);
-    }
-
-    private boolean isJsonLogicCondition(JsonNode condition) {
-        if (condition == null || !condition.isObject() || condition.size() != 1) {
-            return false;
-        }
-        return resolveJsonLogicOperator(condition) != null;
-    }
-
-    private String resolveJsonLogicOperator(JsonNode expression) {
-        if (expression == null || !expression.isObject() || expression.size() != 1) {
-            return null;
-        }
-        for (String operator : JSON_LOGIC_OPERATORS) {
-            if (expression.has(operator)) {
-                return operator;
-            }
-        }
-        return null;
-    }
-
-    private JsonNode evaluateJsonLogic(JsonNode expression, ObjectNode context) {
-        if (expression == null || expression.isNull() || expression.isMissingNode()) {
-            return null;
-        }
-
-        if (!expression.isObject() || expression.size() != 1) {
-            return expression;
-        }
-
-        String op = resolveJsonLogicOperator(expression);
-        if (op == null) {
-            return expression;
-        }
-        JsonNode rawArgs = expression.get(op);
-        List<JsonNode> args = normalizeJsonLogicArgs(rawArgs);
-
-        switch (op) {
-            case "var":
-                return evaluateJsonLogicVar(rawArgs, context);
-            case "==":
-                return objectMapper.getNodeFactory().booleanNode(
-                        compareEq(evaluateJsonLogicArg(args, 0, context), evaluateJsonLogicArg(args, 1, context))
-                );
-            case "!=":
-                return objectMapper.getNodeFactory().booleanNode(
-                        !compareEq(evaluateJsonLogicArg(args, 0, context), evaluateJsonLogicArg(args, 1, context))
-                );
-            case ">":
-                return objectMapper.getNodeFactory().booleanNode(
-                        compareNumeric(evaluateJsonLogicArg(args, 0, context), evaluateJsonLogicArg(args, 1, context), 1)
-                );
-            case ">=":
-                return objectMapper.getNodeFactory().booleanNode(
-                        compareNumeric(evaluateJsonLogicArg(args, 0, context), evaluateJsonLogicArg(args, 1, context), 0, 1)
-                );
-            case "<":
-                return objectMapper.getNodeFactory().booleanNode(
-                        compareNumeric(evaluateJsonLogicArg(args, 0, context), evaluateJsonLogicArg(args, 1, context), -1)
-                );
-            case "<=":
-                return objectMapper.getNodeFactory().booleanNode(
-                        compareNumeric(evaluateJsonLogicArg(args, 0, context), evaluateJsonLogicArg(args, 1, context), 0, -1)
-                );
-            case "in":
-                return objectMapper.getNodeFactory().booleanNode(
-                        jsonLogicIn(evaluateJsonLogicArg(args, 0, context), evaluateJsonLogicArg(args, 1, context))
-                );
-            case "and":
-                return objectMapper.getNodeFactory().booleanNode(jsonLogicAnd(args, context));
-            case "or":
-                return objectMapper.getNodeFactory().booleanNode(jsonLogicOr(args, context));
-            case "!":
-                return objectMapper.getNodeFactory().booleanNode(!isTruthy(evaluateJsonLogicArg(args, 0, context)));
-            case "matches":
-                return objectMapper.getNodeFactory().booleanNode(jsonLogicMatches(args, context));
-            default:
-                return expression;
-        }
-    }
-
-    private List<JsonNode> normalizeJsonLogicArgs(JsonNode rawArgs) {
-        List<JsonNode> args = new ArrayList<>();
-        if (rawArgs == null || rawArgs.isNull() || rawArgs.isMissingNode()) {
-            return args;
-        }
-        if (rawArgs.isArray()) {
-            rawArgs.forEach(args::add);
-            return args;
-        }
-        args.add(rawArgs);
-        return args;
-    }
-
-    private JsonNode evaluateJsonLogicVar(JsonNode rawArgs, ObjectNode context) {
-        if (rawArgs == null || rawArgs.isNull() || rawArgs.isMissingNode()) {
-            return null;
-        }
-
-        if (rawArgs.isString()) {
-            return resolveFactValue(context, rawArgs.asString());
-        }
-
-        if (rawArgs.isArray() && rawArgs.size() > 0) {
-            JsonNode keyNode = rawArgs.get(0);
-            JsonNode defaultValue = rawArgs.size() > 1 ? rawArgs.get(1) : null;
-            if (keyNode != null && keyNode.isString()) {
-                JsonNode resolved = resolveFactValue(context, keyNode.asString());
-                if (resolved != null) {
-                    return resolved;
-                }
-            }
-            return defaultValue;
-        }
-
-        return null;
-    }
-
-    private JsonNode evaluateJsonLogicArg(List<JsonNode> args, int index, ObjectNode context) {
-        if (index < 0 || index >= args.size()) {
-            return null;
-        }
-        return evaluateJsonLogic(args.get(index), context);
-    }
-
-    private boolean jsonLogicIn(JsonNode left, JsonNode right) {
-        if (right == null || right.isNull() || right.isMissingNode()) {
-            return false;
-        }
-
-        if (right.isArray()) {
-            return containsNode(right, left);
-        }
-
-        if (left != null && left.isArray()) {
-            for (JsonNode item : left) {
-                if (compareEq(item, right)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        if (left != null && left.isString() && right.isString()) {
-            return right.asString().contains(left.asString());
-        }
-
-        return compareEq(left, right);
-    }
-
-    private boolean jsonLogicAnd(List<JsonNode> args, ObjectNode context) {
-        if (args.isEmpty()) {
-            return false;
-        }
-        for (JsonNode arg : args) {
-            if (!isTruthy(evaluateJsonLogic(arg, context))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean jsonLogicOr(List<JsonNode> args, ObjectNode context) {
-        for (JsonNode arg : args) {
-            if (isTruthy(evaluateJsonLogic(arg, context))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean jsonLogicMatches(List<JsonNode> args, ObjectNode context) {
-        JsonNode valueNode = evaluateJsonLogicArg(args, 0, context);
-        JsonNode patternNode = evaluateJsonLogicArg(args, 1, context);
-        if (valueNode == null || patternNode == null || !valueNode.isString() || !patternNode.isString()) {
-            return false;
-        }
-        String pattern = safeString(patternNode.asString());
-        if (pattern.isEmpty()) {
-            return false;
-        }
-        return Pattern.compile(pattern).matcher(valueNode.asString()).find();
-    }
-
-    private boolean isTruthy(JsonNode value) {
-        if (value == null || value.isNull() || value.isMissingNode()) {
-            return false;
-        }
-        if (value.isBoolean()) {
-            return value.asBoolean();
-        }
-        if (value.isNumber()) {
-            return Double.compare(value.asDouble(), 0d) != 0;
-        }
-        if (value.isString()) {
-            return !value.asString().isEmpty();
-        }
-        if (value.isArray()) {
-            return value.size() > 0;
-        }
-        return true;
-    }
-
-    private boolean evaluateLeafCondition(JsonNode condition, ObjectNode context) {
-        String fact = safeString(condition.path("fact").asString());
-        String op = safeString(condition.path("op").asString());
-        if (fact.isEmpty() || op.isEmpty()) {
-            return false;
-        }
-
-        JsonNode factValue = resolveFactValue(context, fact);
-        switch (op) {
-            case "eq":
-                return compareEq(factValue, condition.get("value"));
-            case "ne":
-                return !compareEq(factValue, condition.get("value"));
-            case "in":
-                return compareIn(factValue, condition.path("values"), true);
-            case "notIn":
-                return compareIn(factValue, condition.path("values"), false);
-            case "gt":
-                return compareNumeric(factValue, condition.get("value"), 1);
-            case "gte":
-                return compareNumeric(factValue, condition.get("value"), 0, 1);
-            case "lt":
-                return compareNumeric(factValue, condition.get("value"), -1);
-            case "lte":
-                return compareNumeric(factValue, condition.get("value"), 0, -1);
-            case "exists":
-                return factValue != null && !factValue.isNull() && !factValue.isMissingNode();
-            case "matches":
-                if (factValue == null || !factValue.isString()) {
-                    return false;
-                }
-                String pattern = safeString(condition.path("pattern").asString());
-                if (pattern.isEmpty()) {
-                    return false;
-                }
-                return Pattern.compile(pattern).matcher(factValue.asString()).find();
-            default:
-                return false;
-        }
-    }
-
-    private boolean compareEq(JsonNode left, JsonNode right) {
-        if (left == null || left.isNull() || left.isMissingNode()) {
-            return right == null || right.isNull() || right.isMissingNode();
-        }
-        if (right == null || right.isNull() || right.isMissingNode()) {
-            return false;
-        }
-        if (left.isNumber() && right.isNumber()) {
-            return Double.compare(left.asDouble(), right.asDouble()) == 0;
-        }
-        if (left.isBoolean() && right.isBoolean()) {
-            return left.asBoolean() == right.asBoolean();
-        }
-        return left.asString().equals(right.asString());
-    }
-
-    private boolean compareIn(JsonNode factValue, JsonNode values, boolean positiveCheck) {
-        if (values == null || !values.isArray()) {
-            return !positiveCheck;
-        }
-
-        boolean contains;
-        if (factValue != null && factValue.isArray()) {
-            contains = false;
-            for (JsonNode item : factValue) {
-                if (containsNode(values, item)) {
-                    contains = true;
-                    break;
-                }
-            }
-        } else {
-            contains = containsNode(values, factValue);
-        }
-
-        return positiveCheck ? contains : !contains;
-    }
-
-    private boolean containsNode(JsonNode values, JsonNode candidate) {
-        for (JsonNode value : values) {
-            if (compareEq(candidate, value)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean compareNumeric(JsonNode left, JsonNode right, int... allowedSigns) {
-        if (left == null || right == null || !left.isNumber() || !right.isNumber()) {
-            return false;
-        }
-        int sign = Double.compare(left.asDouble(), right.asDouble());
-        for (int allowed : allowedSigns) {
-            if (sign == allowed) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private JsonNode resolveFactValue(ObjectNode context, String factPath) {
-        JsonNode current = context;
-        String[] segments = factPath.split("\\.");
-        for (String segment : segments) {
-            if (segment == null || segment.isBlank()) {
-                continue;
-            }
-            if (current == null || !current.isObject()) {
-                return null;
-            }
-            current = current.get(segment);
-            if (current == null) {
-                return null;
-            }
-        }
-        return current;
+    private boolean isInitializationPhase(ResolveDefinitionViewRequest request) {
+        return request != null && Boolean.TRUE.equals(request.getFormInitialization());
     }
 
     private void filterLayout(ArrayNode sourceLayout,
                               ArrayNode targetLayout,
-                              Map<String, RuleEffectState> formRuleState,
-                              Map<String, RuleEffectState> stepRuleState,
+                              Map<String, WorkflowRuleEngine.RuleEffectState> formRuleState,
+                              Map<String, WorkflowRuleEngine.RuleEffectState> stepRuleState,
                               Map<String, ObjectNode> formHtmxByTarget,
                               Map<String, ObjectNode> stepHtmxByTarget,
                               Set<String> readablePointers,
@@ -1280,8 +926,8 @@ public class WorkflowDefinitionService {
 
     private void applyColumnVisibility(ObjectNode control,
                                        String controlTarget,
-                                       Map<String, RuleEffectState> formRuleState,
-                                       Map<String, RuleEffectState> stepRuleState) {
+                                       Map<String, WorkflowRuleEngine.RuleEffectState> formRuleState,
+                                       Map<String, WorkflowRuleEngine.RuleEffectState> stepRuleState) {
         if (control == null) {
             return;
         }
@@ -1302,12 +948,12 @@ public class WorkflowDefinitionService {
             }
 
             String columnTarget = controlTarget + ".columns." + key;
-            RuleEffectState formState = formRuleState.get(columnTarget);
-            RuleEffectState stepState = stepRuleState.get(columnTarget);
+            WorkflowRuleEngine.RuleEffectState formState = formRuleState.get(columnTarget);
+            WorkflowRuleEngine.RuleEffectState stepState = stepRuleState.get(columnTarget);
 
             boolean baseVisible = !column.has("visible") || column.path("visible").asBoolean(true);
-            boolean formVisible = formState != null && formState.visible != null ? formState.visible : baseVisible;
-            boolean stepVisible = stepState != null && stepState.visible != null ? stepState.visible : true;
+            boolean formVisible = formState != null && formState.visible() != null ? formState.visible() : baseVisible;
+            boolean stepVisible = stepState != null && stepState.visible() != null ? stepState.visible() : true;
             boolean visible = formVisible && stepVisible;
 
             column.put("visible", visible);
@@ -1359,33 +1005,33 @@ public class WorkflowDefinitionService {
 
     private EffectiveControlState resolveEffectiveControlState(ObjectNode control,
                                                                String target,
-                                                               Map<String, RuleEffectState> formRuleState,
-                                                               Map<String, RuleEffectState> stepRuleState) {
+                                                               Map<String, WorkflowRuleEngine.RuleEffectState> formRuleState,
+                                                               Map<String, WorkflowRuleEngine.RuleEffectState> stepRuleState) {
         boolean baseVisible = !control.has("visible") || control.path("visible").asBoolean(true);
         boolean baseEnabled = !control.has("enabled") || control.path("enabled").asBoolean(true);
         boolean baseRequired = control.path("required").asBoolean(false);
 
-        RuleEffectState formState = target.isEmpty() ? null : formRuleState.get(target);
-        RuleEffectState stepState = target.isEmpty() ? null : stepRuleState.get(target);
+        WorkflowRuleEngine.RuleEffectState formState = target.isEmpty() ? null : formRuleState.get(target);
+        WorkflowRuleEngine.RuleEffectState stepState = target.isEmpty() ? null : stepRuleState.get(target);
 
-        boolean formVisible = formState != null && formState.visible != null ? formState.visible : baseVisible;
-        boolean stepVisible = stepState != null && stepState.visible != null ? stepState.visible : true;
+        boolean formVisible = formState != null && formState.visible() != null ? formState.visible() : baseVisible;
+        boolean stepVisible = stepState != null && stepState.visible() != null ? stepState.visible() : true;
         boolean visible = formVisible && stepVisible;
 
-        boolean formEnabled = formState != null && formState.enabled != null ? formState.enabled : baseEnabled;
-        boolean stepEnabled = stepState != null && stepState.enabled != null ? stepState.enabled : true;
+        boolean formEnabled = formState != null && formState.enabled() != null ? formState.enabled() : baseEnabled;
+        boolean stepEnabled = stepState != null && stepState.enabled() != null ? stepState.enabled() : true;
         boolean enabled = formEnabled && stepEnabled;
 
-        boolean formRequired = formState != null && formState.required != null ? formState.required : baseRequired;
-        boolean stepRequired = stepState != null && stepState.required != null && stepState.required;
+        boolean formRequired = formState != null && formState.required() != null ? formState.required() : baseRequired;
+        boolean stepRequired = stepState != null && stepState.required() != null && stepState.required();
         boolean required = formRequired || stepRequired;
 
-        boolean formReadable = formState != null && formState.readable != null ? formState.readable : formVisible;
-        boolean stepReadable = stepState != null && stepState.readable != null ? stepState.readable : true;
+        boolean formReadable = formState != null && formState.readable() != null ? formState.readable() : formVisible;
+        boolean stepReadable = stepState != null && stepState.readable() != null ? stepState.readable() : true;
         boolean readable = visible && formReadable && stepReadable;
 
-        boolean formWritable = formState != null && formState.writable != null ? formState.writable : formEnabled;
-        boolean stepWritable = stepState != null && stepState.writable != null ? stepState.writable : true;
+        boolean formWritable = formState != null && formState.writable() != null ? formState.writable() : formEnabled;
+        boolean stepWritable = stepState != null && stepState.writable() != null ? stepState.writable() : true;
         boolean writable = readable && enabled && formWritable && stepWritable;
 
         boolean sectionWidget = "section".equals(safeString(control.path("widget").asString()));
@@ -1398,11 +1044,11 @@ public class WorkflowDefinitionService {
         boolean collapsed = false;
         if (sectionWidget) {
             collapsed = baseCollapsed;
-            if (formState != null && formState.collapsed != null) {
-                collapsed = formState.collapsed;
+            if (formState != null && formState.collapsed() != null) {
+                collapsed = formState.collapsed();
             }
-            if (stepState != null && stepState.collapsed != null) {
-                collapsed = stepState.collapsed;
+            if (stepState != null && stepState.collapsed() != null) {
+                collapsed = stepState.collapsed();
             }
             if (!collapsible) {
                 collapsed = false;
@@ -1482,44 +1128,6 @@ public class WorkflowDefinitionService {
 
     private String safeString(String value) {
         return value == null ? "" : value.trim();
-    }
-
-    private static final class RuleEffectState {
-        private Boolean visible;
-        private Boolean enabled;
-        private Boolean required;
-        private Boolean readable;
-        private Boolean writable;
-        private Boolean collapsed;
-
-        private void apply(String effect, boolean value) {
-            switch (effect) {
-                case "visible":
-                    this.visible = value;
-                    break;
-                case "enabled":
-                    this.enabled = value;
-                    break;
-                case "required":
-                    this.required = value;
-                    break;
-                case "readable":
-                    this.readable = value;
-                    break;
-                case "writable":
-                    this.writable = value;
-                    break;
-                case "collapsed":
-                    this.collapsed = value;
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        private void applyCollapsed(boolean value) {
-            this.collapsed = value;
-        }
     }
 
     private static final class EffectiveControlState {

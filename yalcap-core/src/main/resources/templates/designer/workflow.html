@@ -52,32 +52,12 @@
                 </div>
                 <p class="subtle" x-show="!paletteCollapsed" x-cloak>Drag a step type into the canvas.</p>
                 <div class="palette-list">
-                    <div class="palette-item" data-step-type="form">
-                        <span class="palette-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
-                                <rect x="5" y="4" width="14" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
-                                <path d="M8 9h8M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-                            </svg>
-                        </span>
-                        <span class="palette-label" x-show="!paletteCollapsed" x-cloak>Form step</span>
-                    </div>
-                    <div class="palette-item" data-step-type="service">
-                        <span class="palette-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
-                                <rect x="4" y="6" width="16" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
-                                <path d="M8 10h8M8 14h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-                            </svg>
-                        </span>
-                        <span class="palette-label" x-show="!paletteCollapsed" x-cloak>Service step</span>
-                    </div>
-                    <div class="palette-item" data-step-type="decision">
-                        <span class="palette-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
-                                <path d="M12 3l8 9-8 9-8-9 8-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
-                            </svg>
-                        </span>
-                        <span class="palette-label" x-show="!paletteCollapsed" x-cloak>Decision step</span>
-                    </div>
+                    <template x-for="stepType in stepTypes" :key="stepType.type">
+                        <div class="palette-item" :data-step-type="stepType.type" :class="'palette-item--' + stepType.type">
+                            <span class="palette-icon" aria-hidden="true" x-text="stepType.type === 'service' ? '⚙' : (stepType.type === 'form' ? '▦' : (stepType.type === 'decision' ? '◆' : '•'))"></span>
+                            <span class="palette-label" x-show="!paletteCollapsed" x-cloak x-text="stepType.displayName || stepType.type"></span>
+                        </div>
+                    </template>
                 </div>
             </aside>
 
@@ -112,49 +92,48 @@
 
                                 <label>Type</label>
                                 <select x-model="selectedStepDraft.type" @change="syncSelectedStep()">
-                                    <option value="form">form</option>
-                                    <option value="service">service</option>
-                                    <option value="decision">decision</option>
+                                    <template x-for="stepType in stepTypes" :key="stepType.type">
+                                        <option :value="stepType.type" x-text="stepType.type"></option>
+                                    </template>
                                 </select>
 
-                                <template x-if="selectedStepDraft.type === 'form'">
-                                    <div>
-                                        <label>Assignee kind</label>
-                                        <select x-model="selectedStepDraft.assignee.kind" @change="syncSelectedStep()">
-                                            <option value="INTERNAL_USER">INTERNAL_USER</option>
-                                            <option value="INTERNAL_GROUP">INTERNAL_GROUP</option>
-                                            <option value="EXTERNAL_EMAIL">EXTERNAL_EMAIL</option>
-                                        </select>
+                                <p class="step-hint" x-show="selectedStepHint" x-text="selectedStepHint" x-cloak></p>
 
-                                        <label>Assignee value</label>
-                                        <input x-model="selectedStepDraft.assignee.value" @input="syncSelectedStep()" placeholder="user/group/email or expression" />
+                                <template x-for="field in getSelectedStepConfigFields()" :key="field.key">
+                                    <div>
+                                        <label x-text="field.title || field.key"></label>
+                                        <template x-if="field.enumValues.length > 0">
+                                            <select :value="getSelectedStepConfigValue(field.key)" @change="updateSelectedStepConfig(field, $event.target.value)">
+                                                <template x-for="optionValue in field.enumValues" :key="optionValue">
+                                                    <option :value="optionValue" x-text="optionValue"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+                                        <template x-if="field.enumValues.length === 0 && field.format === 'json'">
+                                            <textarea rows="5" :value="getSelectedStepConfigValue(field.key)" @input="updateSelectedStepConfig(field, $event.target.value)" :placeholder="field.placeholder || ''"></textarea>
+                                        </template>
+                                        <template x-if="field.enumValues.length === 0 && field.format !== 'json'">
+                                            <input :value="getSelectedStepConfigValue(field.key)" @input="updateSelectedStepConfig(field, $event.target.value)" :placeholder="field.placeholder || ''" />
+                                        </template>
+                                        <p class="subtle" x-show="configFieldErrors[field.key]" x-text="configFieldErrors[field.key]"></p>
                                     </div>
                                 </template>
 
-                                <template x-if="selectedStepDraft.type !== 'decision'">
+                                <template x-if="getSelectedStepOutputCount() <= 1">
                                     <div>
                                         <label>Next step id (derived from connections)</label>
                                         <input x-model="selectedStepDraft.next" disabled />
                                     </div>
                                 </template>
 
-                                <template x-if="selectedStepDraft.type === 'decision'">
+                                <template x-if="getSelectedStepOutputCount() > 1">
                                     <div>
-                                        <label>Condition logic (JSON)</label>
-                                        <textarea rows="5" x-model="selectedStepDraft.conditionJson" @input="syncSelectedStep()" placeholder='{"==":[{"var":"data.status"},"approved"]}'></textarea>
-                                        <p class="subtle" x-show="decisionConditionError" x-text="decisionConditionError"></p>
-
-                                        <label>Action 1 label</label>
-                                        <input x-model="selectedStepDraft.transitionLabels.output_1" @input="syncSelectedStep()" placeholder="Approve" />
-
-                                        <label>Action 1 target (derived from connector 1)</label>
-                                        <input :value="selectedStepDraft.transitions.output_1 || ''" disabled />
-
-                                        <label>Action 2 label</label>
-                                        <input x-model="selectedStepDraft.transitionLabels.output_2" @input="syncSelectedStep()" placeholder="Reject" />
-
-                                        <label>Action 2 target (derived from connector 2)</label>
-                                        <input :value="selectedStepDraft.transitions.output_2 || ''" disabled />
+                                        <template x-for="outputIndex in getSelectedStepOutputIndices()" :key="outputIndex">
+                                            <div>
+                                                <label x-text="'Action ' + outputIndex + ' target (derived from connector ' + outputIndex + ')' "></label>
+                                                <input :value="selectedStepDraft.transitions['output_' + outputIndex] || ''" disabled />
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
 
@@ -203,6 +182,7 @@
         <script th:inline="javascript">
             window.workflowDesignerInitialDefinition = /*[[${activeDefinition != null ? activeDefinition.definition : null}]]*/ null;
             window.workflowDesignerInitialKey = /*[[${definitionKey}]]*/ 'example-review';
+            window.workflowDesignerStepTypes = /*[[${workflowStepTypes}]]*/ [];
         </script>
     </div>
 </body>

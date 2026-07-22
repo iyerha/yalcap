@@ -3,7 +3,7 @@
     const windowAny = /** @type {any} */ (window);
 
     const coreInteractionsApi = /** @type {Record<string, any>} */ ({
-        newControlId() {
+        newControlLocalId() {
             const seq = this.nextControlSeq;
             this.nextControlSeq += 1;
             return `ctrl-${Date.now()}-${seq}`;
@@ -21,7 +21,8 @@
             const next = this.controls.length + 1;
             const withOptions = this.isOptionWidget(base.widget);
             return {
-                id: this.newControlId(),
+                localId: this.newControlLocalId(),
+                id: this.newControlPersistentId(),
                 name: this.toIdentifier(`${base.label} ${next}`),
                 stateKey: this.slugify(`${base.label} ${next}`),
                 label: `${base.label} ${next}`,
@@ -109,16 +110,16 @@
             return '';
         },
 
-        /** @param {string} controlId @param {Array<any>=} list @param {any=} parent */
-        findControlById(controlId, list = undefined, parent = null) {
+        /** @param {string} localId @param {Array<any>=} list @param {any=} parent */
+        findControlByLocalId(localId, list = undefined, parent = null) {
             const items = Array.isArray(list) ? list : this.controls;
             for (let i = 0; i < items.length; i += 1) {
                 const control = items[i];
-                if (control.id === controlId) {
+                if (control.localId === localId) {
                     return { control, index: i, list: items, parent };
                 }
                 if (Array.isArray(control.children) && control.children.length > 0) {
-                    const found = this.findControlById(controlId, control.children, control);
+                    const found = this.findControlByLocalId(localId, control.children, control);
                     if (found) {
                         return found;
                     }
@@ -134,7 +135,7 @@
 
         /** @param {string} containerId @param {string} possibleDescendantId */
         isDescendantId(containerId, possibleDescendantId) {
-            const containerRef = this.findControlById(containerId);
+            const containerRef = this.findControlByLocalId(containerId);
             if (!containerRef || !Array.isArray(containerRef.control.children)) {
                 return false;
             }
@@ -143,7 +144,7 @@
             const walk = (children) => {
                 for (let i = 0; i < children.length; i += 1) {
                     const child = children[i];
-                    if (child.id === possibleDescendantId) {
+                    if (child.localId === possibleDescendantId) {
                         return true;
                     }
                     if (Array.isArray(child.children) && walk(child.children)) {
@@ -156,36 +157,36 @@
             return walk(containerRef.control.children);
         },
 
-        /** @param {string} controlId */
-        detachControl(controlId) {
-            const found = this.findControlById(controlId);
+        /** @param {string} localId */
+        detachControl(localId) {
+            const found = this.findControlByLocalId(localId);
             if (!found) {
                 return null;
             }
             return found.list.splice(found.index, 1)[0];
         },
 
-        /** @param {string | null} id */
-        selectControl(id) {
-            this.selectedControlId = id;
+        /** @param {string | null} localId */
+        selectControl(localId) {
+            this.selectedControlLocalId = localId;
             this.lastSelectedAt = Date.now();
             this.stateKeyEditEnabled = false;
-            const found = this.findControlById(id);
+            const found = this.findControlByLocalId(localId);
             this.selectedControl = found ? this.normalizeControl(found.control) : null;
             this.validateSelected();
         },
 
         clearSelection() {
-            this.selectedControlId = null;
+            this.selectedControlLocalId = null;
             this.selectedControl = null;
             this.stateKeyEditEnabled = false;
             this.lastSelectedAt = 0;
             this.validationErrors = [];
         },
 
-        /** @param {string} controlId @param {(control: any) => void} mutator */
-        updateCanvasControl(controlId, mutator) {
-            const found = this.findControlById(controlId);
+        /** @param {string} localId @param {(control: any) => void} mutator */
+        updateCanvasControl(localId, mutator) {
+            const found = this.findControlByLocalId(localId);
             if (!found) {
                 return;
             }
@@ -202,7 +203,7 @@
             const normalized = this.normalizeControl(draft);
             found.list[found.index] = normalized;
 
-            if (this.selectedControlId === controlId) {
+            if (this.selectedControlLocalId === localId) {
                 this.selectedControl = {
                     ...normalized,
                     options: Array.isArray(normalized.options) ? normalized.options.map((/** @type {any} */ o) => ({ ...o })) : [],

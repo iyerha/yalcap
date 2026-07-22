@@ -1,7 +1,7 @@
 <th:block xmlns:th="http://www.thymeleaf.org" th:fragment="page">
     <section class="card" x-show="activePage === 'rules'" x-cloak x-init="ensureDecisionTables()">
         <h3>Rules</h3>
-        <p class="subtle">Matrix decision table. Input columns define Field + Operator. Action columns can be UI toggles (target + property) or API calls.</p>
+        <p class="subtle">Matrix decision table. Input columns define Field + Operator. Action columns can be UI toggles, API calls, or derived value expressions.</p>
 
         <div class="decision-table-tabs">
             <template x-for="table in decisionTables" :key="table.id">
@@ -81,6 +81,7 @@
                         <select x-model="column.kind">
                             <option value="ui">UI</option>
                             <option value="api">API</option>
+                            <option value="derive">Derive</option>
                         </select>
                         <template x-if="String(column.kind || 'ui').toLowerCase() === 'ui'">
                             <div class="decision-action-ui-fields">
@@ -120,6 +121,12 @@
                                     <option value="afterend">afterend</option>
                                 </select>
                                 <input x-model="column.apiValsTemplate" placeholder='{"amount":"{{data.amount}}"}' />
+                            </div>
+                        </template>
+                        <template x-if="String(column.kind || 'ui').toLowerCase() === 'derive'">
+                            <div class="decision-action-ui-fields">
+                                <input x-model="column.deriveTarget" list="state-key-options" placeholder="summary.total" />
+                                <input x-model="column.deriveExpression" placeholder='{"+": [{"var":"data.base"}, {"var":"data.tax"}]}' />
                             </div>
                         </template>
                     </div>
@@ -187,6 +194,10 @@
                                         <option value="all">all</option>
                                         <option value="any">any</option>
                                     </select>
+                                    <label class="checkbox-inline">
+                                        <input type="checkbox" x-model="rule.runOnInit" />
+                                        Run this rule during server form initialization only
+                                    </label>
                                     <label>JSON Logic (optional override)</label>
                                     <textarea rows="3" x-model="rule.whenJsonLogic" placeholder='{"==":[{"var":"workflow.stepId"},"review"]}'></textarea>
                                 </div>

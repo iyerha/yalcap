@@ -104,6 +104,7 @@
             this.rules.push({
                 id: `rule-${nextIndex}`,
                 scope: 'form',
+                runOnInit: false,
                 whenFact: '',
                 whenOp: 'eq',
                 whenValue: '',
@@ -133,6 +134,7 @@
             const rule = {
                 id: `rule-${nextIndex}`,
                 scope: 'form',
+                runOnInit: false,
                 whenFact: '',
                 whenOp: 'eq',
                 whenValue: '',
@@ -244,6 +246,9 @@
             if (!rule.scope) {
                 rule.scope = this.decisionTableScope || 'form';
             }
+            if (rule.runOnInit !== true) {
+                rule.runOnInit = false;
+            }
 
             if (!rule.decisionInputs || typeof rule.decisionInputs !== 'object') {
                 rule.decisionInputs = {};
@@ -305,7 +310,16 @@
             this.nextDecisionColumnSeq += 1;
             return {
                 id: `out-${next}`,
-                kind: String(config.kind || 'ui').trim().toLowerCase() === 'api' ? 'api' : 'ui',
+                kind: (() => {
+                    const raw = String(config.kind || 'ui').trim().toLowerCase();
+                    if (raw === 'api') {
+                        return 'api';
+                    }
+                    if (raw === 'derive') {
+                        return 'derive';
+                    }
+                    return 'ui';
+                })(),
                 target: String(config.target || '').trim(),
                 property: String(config.property || 'visible').trim() || 'visible',
                 apiEndpoint: String(config.apiEndpoint || '').trim(),
@@ -313,7 +327,9 @@
                 apiTrigger: String(config.apiTrigger || 'change').trim().toLowerCase() || 'change',
                 apiTarget: String(config.apiTarget || '').trim(),
                 apiSwap: String(config.apiSwap || 'innerHTML').trim() || 'innerHTML',
-                apiValsTemplate: String(config.apiValsTemplate || '').trim()
+                apiValsTemplate: String(config.apiValsTemplate || '').trim(),
+                deriveTarget: String(config.deriveTarget || config.target || '').trim(),
+                deriveExpression: String(config.deriveExpression || '').trim()
             };
         },
 

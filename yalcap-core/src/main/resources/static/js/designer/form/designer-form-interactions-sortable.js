@@ -201,7 +201,7 @@
                 return;
             }
 
-            const movingRef = this.findControlById(controlId);
+            const movingRef = this.findControlByLocalId(controlId);
             if (!movingRef || !this.canInsertIntoSource(targetSourceId, movingRef.control, controlId)) {
                 this.flashInvalidDrop(evt.to);
                 this.syncSortableDom();
@@ -261,7 +261,7 @@
                 return this.controls;
             }
 
-            const containerRef = this.findControlById(sourceId);
+            const containerRef = this.findControlByLocalId(sourceId);
             if (!containerRef || !this.isContainerWidget(containerRef.control.widget)) {
                 return null;
             }
@@ -313,7 +313,7 @@
                 return true;
             }
 
-            const containerRef = this.findControlById(sourceId);
+            const containerRef = this.findControlByLocalId(sourceId);
             if (!containerRef || !containerRef.control) {
                 return false;
             }

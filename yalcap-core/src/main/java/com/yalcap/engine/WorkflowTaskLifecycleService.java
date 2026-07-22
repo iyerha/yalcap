@@ -1,7 +1,7 @@
 package com.yalcap.engine;
 
 import com.yalcap.definition.form.load.FormLoadDataContext;
-import com.yalcap.definition.form.load.FormLoadDataHydrationService;
+import com.yalcap.definition.form.load.FormLoadDataService;
 import com.yalcap.definition.form.load.FormLoadDataPhase;
 import com.yalcap.persistence.AssignmentEntity;
 import com.yalcap.persistence.AssignmentRepository;
@@ -30,14 +30,14 @@ public class WorkflowTaskLifecycleService {
     private final AssignmentRepository assignmentRepository;
     private final EventRepository eventRepository;
     private final TaskAssignmentResolver taskAssignmentResolver;
-    private final FormLoadDataHydrationService formLoadDataHydrationService;
+    private final FormLoadDataService formLoadDataHydrationService;
     private final ObjectMapper objectMapper;
 
     public WorkflowTaskLifecycleService(WorkflowInstanceRepository workflowInstanceRepository,
                                         AssignmentRepository assignmentRepository,
                                         EventRepository eventRepository,
                                         TaskAssignmentResolver taskAssignmentResolver,
-                                        FormLoadDataHydrationService formLoadDataHydrationService,
+                                        FormLoadDataService formLoadDataHydrationService,
                                         ObjectMapper objectMapper) {
         this.workflowInstanceRepository = workflowInstanceRepository;
         this.assignmentRepository = assignmentRepository;
@@ -53,7 +53,7 @@ public class WorkflowTaskLifecycleService {
         UUID tenantId = resolveTenantId(instance.getTenantId());
 
         ObjectNode workingData = asObjectNode(instance.getData()).deepCopy();
-        ObjectNode hydratedData = formLoadDataHydrationService.hydrate(
+        ObjectNode hydratedData = formLoadDataHydrationService.load(
                 new FormLoadDataContext(
                         command.definitionKey(),
                         command.stepId(),
@@ -114,7 +114,7 @@ public class WorkflowTaskLifecycleService {
         ObjectNode submittedData = asObjectNode(command.submittedData()).deepCopy();
         ObjectNode mergedInput = mergeData(instanceData, submittedData);
 
-        ObjectNode hydratedData = formLoadDataHydrationService.hydrate(
+        ObjectNode hydratedData = formLoadDataHydrationService.load(
                 new FormLoadDataContext(
                         command.definitionKey(),
                         command.stepId(),

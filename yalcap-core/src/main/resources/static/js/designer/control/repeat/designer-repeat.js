@@ -24,7 +24,7 @@
                 container.children = [];
             }
 
-            const existingChildren = container.children.filter((/** @type {any} */ child) => child && child.id !== controlId);
+            const existingChildren = container.children.filter((/** @type {any} */ child) => child && child.localId !== controlId);
             if (existingChildren.length >= 1) {
                 return false;
             }

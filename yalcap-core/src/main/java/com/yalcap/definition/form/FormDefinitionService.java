@@ -10,7 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.i18n.LocaleContextHolder;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,7 +44,8 @@ public class FormDefinitionService {
 
     @Transactional
     public FormDefinitionEntity publish(String formKey, JsonNode definition, String createdBy, String changeMessage) {
-        validateFormDefinition(definition);
+        JsonNode preparedDefinition = prepareDefinition(definition);
+        validateFormDefinition(preparedDefinition);
 
         Optional<FormDefinitionEntity> active = repository.findByFormKeyAndActiveTrue(formKey);
         int nextVersion = active.map(entry -> entry.getVersionNumber() + 1).orElse(1);
@@ -54,7 +58,7 @@ public class FormDefinitionService {
         FormDefinitionEntity published = new FormDefinitionEntity(
                 null,
                 formKey,
-                definition,
+                preparedDefinition,
                 nextVersion,
                 true,
                 TenantContext.getTenantId().orElse(UUID.fromString("00000000-0000-0000-0000-000000000000")),
@@ -62,6 +66,61 @@ public class FormDefinitionService {
                 changeMessage
         );
         return repository.save(published);
+    }
+
+    private JsonNode prepareDefinition(JsonNode definition) {
+        if (definition == null || definition.isNull() || !definition.isObject()) {
+            throw new IllegalArgumentException("Form definition payload must be a JSON object");
+        }
+
+        ObjectNode prepared = ((ObjectNode) definition).deepCopy();
+        JsonNode layout = prepared.path("form").path("controlSchema").path("layout");
+        if (layout.isArray()) {
+            ensureControlIds((ArrayNode) layout, "form.controlSchema.layout", new HashSet<>());
+        }
+
+        return prepared;
+    }
+
+    private void ensureControlIds(ArrayNode layout, String contextPath, Set<String> seenIds) {
+        for (int i = 0; i < layout.size(); i += 1) {
+            JsonNode controlNode = layout.get(i);
+            if (!(controlNode instanceof ObjectNode control)) {
+                continue;
+            }
+
+            String controlId = control.path("id").asText("").trim();
+            if (controlId.isEmpty()) {
+                controlId = UUID.randomUUID().toString();
+                control.put("id", controlId);
+            }
+
+            if (!isGuid(controlId)) {
+                throw new IllegalArgumentException(contextPath + "[" + i + "].id must be a valid GUID");
+            }
+
+            String normalizedId = controlId.toLowerCase(Locale.ROOT);
+            if (!seenIds.add(normalizedId)) {
+                throw new IllegalArgumentException(contextPath + "[" + i + "].id must be unique");
+            }
+
+            JsonNode children = control.path("children");
+            if (children.isArray()) {
+                ensureControlIds((ArrayNode) children, contextPath + "[" + i + "].children", seenIds);
+            }
+        }
+    }
+
+    private boolean isGuid(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            UUID.fromString(value.trim());
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     private void validateFormDefinition(JsonNode definition) {

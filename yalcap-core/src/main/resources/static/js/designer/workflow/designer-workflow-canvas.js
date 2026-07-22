@@ -334,7 +334,9 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
         createPointerDragGhost(type) {
             const ghost = document.createElement('div');
             ghost.className = 'palette-drag-ghost';
-            ghost.textContent = type.charAt(0).toUpperCase() + type.slice(1) + ' step';
+            const descriptor = this.getStepTypeDescriptor(type);
+            const label = descriptor && descriptor.displayName ? descriptor.displayName : (type.charAt(0).toUpperCase() + type.slice(1) + ' step');
+            ghost.textContent = label;
             document.body.appendChild(ghost);
             return ghost;
         },
@@ -415,7 +417,8 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             if (this.useFallbackCanvas) {
                 const idx = this.steps.length + 1;
                 const step = this.normalizeStep({ type: type }, idx);
-                step.title = type.charAt(0).toUpperCase() + type.slice(1) + ' step';
+                const descriptor = this.getStepTypeDescriptor(type);
+                step.title = descriptor && descriptor.displayName ? descriptor.displayName : (type.charAt(0).toUpperCase() + type.slice(1) + ' step');
                 step.nodeId = 'fallback-' + idx;
                 if (dropPosition) {
                     step.designer.position = dropPosition;
@@ -442,7 +445,8 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
 
             const idx = this.steps.length + 1;
             const step = this.normalizeStep({ type: type }, idx);
-            step.title = type.charAt(0).toUpperCase() + type.slice(1) + ' step';
+            const descriptor = this.getStepTypeDescriptor(type);
+            step.title = descriptor && descriptor.displayName ? descriptor.displayName : (type.charAt(0).toUpperCase() + type.slice(1) + ' step');
             if (dropPosition) {
                 step.designer.position = dropPosition;
             }
@@ -498,25 +502,29 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
         },
 
         getWorkflowOutputCount(step) {
-            return String(step && step.type ? step.type : 'form') === 'decision' ? 2 : 1;
+            const type = String(step && step.type ? step.type : 'form').trim();
+            return this.getStepTypeOutputCount(type);
         },
 
         getWorkflowTransitionTargets(step) {
             const stepType = String(step && step.type ? step.type : 'form');
+            const outputCount = this.getStepTypeOutputCount(stepType);
             const transitions = step && step.transitions && typeof step.transitions === 'object' && !Array.isArray(step.transitions)
                 ? step.transitions
                 : {};
 
-            if (stepType === 'decision') {
+            if (outputCount > 1) {
                 const transitionValues = Object.keys(transitions)
                     .sort()
                     .map((key) => String(transitions[key] || '').trim())
                     .filter(Boolean);
 
-                return {
-                    output_1: transitionValues[0] || String(step && step.next || '').trim(),
-                    output_2: transitionValues[1] || ''
-                };
+                const outputTransitions = {};
+                for (let outputIndex = 1; outputIndex <= outputCount; outputIndex += 1) {
+                    outputTransitions['output_' + outputIndex] = transitionValues[outputIndex - 1] || (outputIndex === 1 ? String(step && step.next || '').trim() : '');
+                }
+
+                return outputTransitions;
             }
 
             return {
@@ -568,7 +576,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                     return;
                 }
 
-                const outputKeys = String(step.type || '').trim() === 'decision'
+                const outputKeys = this.getWorkflowOutputCount(step) > 1
                     ? Object.keys(graphNode.outputs)
                     : ['output_1'];
 
@@ -584,7 +592,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                         return;
                     }
 
-                    if (String(step.type || '').trim() === 'decision') {
+                    if (this.getWorkflowOutputCount(step) > 1) {
                         step.transitions[outputKey] = nextStepId;
                     }
                     if (!step.next) {
@@ -624,6 +632,9 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                         id: step.id,
                         title: step.title,
                         type: step.type,
+                        config: step.config && typeof step.config === 'object'
+                            ? JSON.parse(JSON.stringify(step.config))
+                            : {},
                         next: step.next || null,
                         designer: {
                             position: {
@@ -635,8 +646,8 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
 
                     if (String(step.type || '').trim() === 'form') {
                         entry.assignee = {
-                            kind: step.assignee.kind,
-                            value: step.assignee.value
+                            kind: String(entry.config.assigneeKind || step.assignee.kind || 'INTERNAL_USER').trim(),
+                            value: String(entry.config.assigneeValue || step.assignee.value || '').trim()
                         };
                     }
 
@@ -644,12 +655,22 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                         entry.transitions = Object.assign({}, step.transitions);
                     }
 
-                    if (String(step.type || '').trim() === 'decision') {
-                        if (step.transitionLabels && Object.keys(step.transitionLabels).length > 0) {
-                            entry.transitionLabels = Object.assign({}, step.transitionLabels);
+                    if (this.getWorkflowOutputCount(step) > 1) {
+                        const labels = {};
+                        const outputCount = this.getWorkflowOutputCount(step);
+                        for (let outputIndex = 1; outputIndex <= outputCount; outputIndex += 1) {
+                            const configLabel = String(entry.config['action' + outputIndex + 'Label'] || '').trim();
+                            labels['output_' + outputIndex] = configLabel || ('Action ' + outputIndex);
                         }
-                        if (step.condition) {
-                            entry.condition = JSON.parse(JSON.stringify(step.condition));
+                        entry.transitionLabels = labels;
+
+                        const conditionText = String(entry.config.conditionJson || '').trim();
+                        if (conditionText) {
+                            try {
+                                entry.condition = JSON.parse(conditionText);
+                            } catch (_) {
+                                // Keep generation resilient while the user is still typing invalid JSON.
+                            }
                         }
                     }
 

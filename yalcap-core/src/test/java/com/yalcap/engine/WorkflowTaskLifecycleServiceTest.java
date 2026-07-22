@@ -1,9 +1,10 @@
 package com.yalcap.engine;
 
 import com.yalcap.definition.form.load.FormLoadDataContext;
-import com.yalcap.definition.form.load.FormLoadDataHydrationService;
+import com.yalcap.definition.form.load.FormLoadDataService;
 import com.yalcap.definition.form.load.FormLoadDataPhase;
 import com.yalcap.definition.form.load.FormLoadDataProvider;
+import com.yalcap.definition.form.load.FormLoadPhaseHandler;
 import com.yalcap.persistence.AssignmentEntity;
 import com.yalcap.persistence.AssignmentRepository;
 import com.yalcap.persistence.EventEntity;
@@ -43,20 +44,15 @@ class WorkflowTaskLifecycleServiceTest {
                 return "pre-create-provider";
             }
 
-            @Override
-            public boolean supportsPhase(FormLoadDataPhase phase) {
-                return phase == FormLoadDataPhase.PRE_TASK_CREATE;
-            }
-
-            @Override
-            public ObjectNode load(FormLoadDataContext context) {
+            @FormLoadPhaseHandler(FormLoadDataPhase.PRE_TASK_CREATE)
+            public ObjectNode onPreTaskCreate(FormLoadDataContext context) {
                 ObjectNode node = objectMapper.createObjectNode();
                 node.put("riskLevel", "LOW");
                 return node;
             }
         };
 
-        FormLoadDataHydrationService hydrationService = new FormLoadDataHydrationService(List.of(provider), objectMapper);
+        FormLoadDataService hydrationService = new FormLoadDataService(List.of(provider), objectMapper);
         WorkflowTaskLifecycleService service = new WorkflowTaskLifecycleService(
                 workflowInstanceRepository,
                 assignmentRepository,
@@ -116,20 +112,15 @@ class WorkflowTaskLifecycleServiceTest {
                 return "pre-complete-provider";
             }
 
-            @Override
-            public boolean supportsPhase(FormLoadDataPhase phase) {
-                return phase == FormLoadDataPhase.PRE_TASK_COMPLETE;
-            }
-
-            @Override
-            public ObjectNode load(FormLoadDataContext context) {
+            @FormLoadPhaseHandler(FormLoadDataPhase.PRE_TASK_COMPLETE)
+            public ObjectNode onPreTaskComplete(FormLoadDataContext context) {
                 ObjectNode node = objectMapper.createObjectNode();
                 node.put("approvedBy", "manager-1");
                 return node;
             }
         };
 
-        FormLoadDataHydrationService hydrationService = new FormLoadDataHydrationService(List.of(provider), objectMapper);
+        FormLoadDataService hydrationService = new FormLoadDataService(List.of(provider), objectMapper);
         WorkflowTaskLifecycleService service = new WorkflowTaskLifecycleService(
                 workflowInstanceRepository,
                 assignmentRepository,

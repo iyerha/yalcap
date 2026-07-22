@@ -7,6 +7,9 @@ import com.yalcap.definition.form.FormDefinitionEntity;
 import com.yalcap.definition.form.FormDefinitionService;
 import com.yalcap.definition.workflow.WorkflowDefinitionEntity;
 import com.yalcap.definition.workflow.WorkflowDefinitionService;
+import com.yalcap.definition.workflow.step.StepTypeClientAssets;
+import com.yalcap.definition.workflow.step.StepTypeDescriptor;
+import com.yalcap.definition.workflow.step.StepTypeRegistry;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -35,15 +38,18 @@ public class DesignerController {
     private final FormDefinitionService formDefinitionService;
     private final WorkflowDefinitionService definitionService;
     private final ControlTypeRegistry controlTypeRegistry;
+    private final StepTypeRegistry stepTypeRegistry;
     private final ObjectMapper objectMapper;
 
     public DesignerController(FormDefinitionService formDefinitionService,
                               WorkflowDefinitionService definitionService,
                               ControlTypeRegistry controlTypeRegistry,
+                              StepTypeRegistry stepTypeRegistry,
                               ObjectMapper objectMapper) {
         this.formDefinitionService = formDefinitionService;
         this.definitionService = definitionService;
         this.controlTypeRegistry = controlTypeRegistry;
+        this.stepTypeRegistry = stepTypeRegistry;
         this.objectMapper = objectMapper;
     }
 
@@ -123,7 +129,7 @@ public class DesignerController {
         String key = definitionKey != null ? definitionKey : "example-review";
         putDefinitionKey(model, key);
         model.addAttribute("tenantId", tenantId);
-        addDesignerAssets(model);
+        addDesignerAssets(model, false);
         formDefinitionService.getActiveForm(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
         return "designer/form";
     }
@@ -135,7 +141,8 @@ public class DesignerController {
         String key = definitionKey != null ? definitionKey : "example-review";
         putDefinitionKey(model, key);
         model.addAttribute("tenantId", tenantId);
-        addDesignerAssets(model);
+        addDesignerAssets(model, true);
+        model.addAttribute("workflowStepTypes", stepTypeRegistry.descriptors());
         model.addAttribute("workflowPublishAction", tenantId != null
             ? "/t/" + tenantId + "/designer/workflow/publish"
             : "/designer/workflow/publish");
@@ -181,7 +188,7 @@ public class DesignerController {
         model.addAttribute("definitionKey", definitionKey);
     }
 
-    private void addDesignerAssets(Model model) {
+    private void addDesignerAssets(Model model, boolean includeStepAssets) {
         Set<String> designerJs = new LinkedHashSet<>();
         Set<String> designerCss = new LinkedHashSet<>();
 
@@ -197,6 +204,22 @@ public class DesignerController {
 
             addAssets(designerJs, assets.designerJs());
             addAssets(designerCss, assets.designerCss());
+        }
+
+        if (includeStepAssets) {
+            for (StepTypeDescriptor descriptor : stepTypeRegistry.descriptors()) {
+                if (descriptor == null) {
+                    continue;
+                }
+
+                StepTypeClientAssets assets = descriptor.clientAssets();
+                if (assets == null) {
+                    continue;
+                }
+
+                addAssets(designerJs, assets.designerJs());
+                addAssets(designerCss, assets.designerCss());
+            }
         }
 
         model.addAttribute("designerJsAssets", new ArrayList<>(designerJs));

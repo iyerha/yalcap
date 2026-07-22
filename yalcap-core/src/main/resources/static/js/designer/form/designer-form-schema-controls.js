@@ -40,6 +40,7 @@
                     rowRequired.push(col.key);
                 }
                 rowLayout.push({
+                    id: typeof ctx.newControlId === 'function' ? ctx.newControlId() : null,
                     pointer: `${ctx.pointerBase}/properties/${repeatControl.name}/items/properties/${col.key}`,
                     widget: (col.type || 'string') === 'number' ? 'number' : 'text',
                     label: col.title || col.key,
@@ -84,6 +85,7 @@
         }));
 
         ctx.layoutTarget.push({
+            id: repeatControl.id,
             pointer: `${ctx.pointerBase}/properties/${repeatControl.name}`,
             stateKey: repeatControl.stateKey || repeatControl.name,
             widget: 'repeat',
@@ -137,6 +139,7 @@
             section(ctx) {
                 const c = ctx.control;
                 const sectionLayout = {
+                    id: c.id,
                     stateKey: c.stateKey || c.name || c.label,
                     widget: 'section',
                     label: c.label,
@@ -174,6 +177,7 @@
 
                 const groupPointer = `${ctx.pointerBase}/properties/${c.name}`;
                 const groupLayout = {
+                    id: c.id,
                     pointer: groupPointer,
                     stateKey: c.stateKey || c.name,
                     widget: 'group',
@@ -212,6 +216,7 @@
                 }
 
                 ctx.layoutTarget.push({
+                    id: c.id,
                     stateKey: c.stateKey || c.name || c.label,
                     widget: 'image',
                     label: c.label,
@@ -275,6 +280,7 @@
                 }
 
                 ctx.layoutTarget.push({
+                    id: c.id,
                     pointer: `${ctx.pointerBase}/properties/${c.name}`,
                     stateKey: c.stateKey || c.name,
                     widget: 'upload',
@@ -297,6 +303,7 @@
             message(ctx) {
                 const c = ctx.control;
                 const layoutItem = {
+                    id: c.id,
                     stateKey: c.stateKey || c.name || c.label,
                     widget: 'message',
                     label: c.label,
@@ -319,6 +326,7 @@
             button(ctx) {
                 const c = ctx.control;
                 const layoutItem = {
+                    id: c.id,
                     stateKey: c.stateKey || c.name || c.label,
                     widget: 'button',
                     label: c.label,

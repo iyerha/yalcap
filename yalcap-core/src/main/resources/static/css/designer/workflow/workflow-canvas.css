@@ -1,0 +1,88 @@
+.canvas-card.pointer-drop-active {
+    border-color: #0e5aa7;
+    box-shadow: 0 0 0 2px #dbeafe;
+}
+
+#drawflowCanvas {
+    position: relative;
+    height: 460px;
+    border: 1px solid #d0d9e8;
+    border-radius: 10px;
+    background: radial-gradient(circle at 1px 1px, #d8dfeb 1px, transparent 0);
+    background-size: 18px 18px;
+    overflow: auto;
+}
+
+#drawflowCanvas .fallback-canvas-layer {
+    position: absolute;
+    inset: 0;
+    min-width: 100%;
+    min-height: 100%;
+}
+
+#drawflowCanvas .fallback-edges {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#drawflowCanvas .fallback-edge-path {
+    fill: none;
+    stroke: #6b8ab8;
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+#drawflowCanvas .fallback-node {
+    position: absolute;
+    min-width: 180px;
+    border: 1px solid #9fb5d3;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.08);
+    cursor: pointer;
+    z-index: 2;
+}
+
+#drawflowCanvas .fallback-node.selected {
+    border-color: #0e5aa7;
+    box-shadow: 0 0 0 2px #dbeafe;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node {
+    border: 1px solid #9fb5d3;
+    border-radius: 10px;
+    min-width: 180px;
+}
+
+#drawflowCanvas .drawflow .drawflow-node.workflow-node.selected {
+    border-color: #0e5aa7;
+    box-shadow: 0 0 0 2px #dbeafe;
+}
+
+.node-shell {
+    padding: 8px;
+}
+
+.node-type {
+    display: inline-block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #1d4f91;
+    background: #e7effb;
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+
+.node-title {
+    margin-top: 8px;
+    font-weight: 600;
+}
+
+.node-id {
+    margin-top: 4px;
+    color: #475467;
+    font-size: 12px;
+}

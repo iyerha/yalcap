@@ -175,7 +175,7 @@
             }
 
             this.selectedControl = this.normalizeControl(this.selectedControl);
-            const found = this.findControlById(this.selectedControlId);
+            const found = this.findControlByLocalId(this.selectedControlLocalId);
             if (!found) {
                 return;
             }
@@ -188,7 +188,7 @@
             };
 
             this.recomputeDerivedStateKeys();
-            const refreshed = this.findControlById(this.selectedControlId);
+            const refreshed = this.findControlByLocalId(this.selectedControlLocalId);
             if (refreshed) {
                 this.selectedControl = this.normalizeControl(refreshed.control);
             }

@@ -2,9 +2,15 @@ package com.yalcap.definition.workflow;
 
 import com.yalcap.asset.AssetFileRepository;
 import com.yalcap.definition.form.load.FormLoadDataContext;
-import com.yalcap.definition.form.load.FormLoadDataHydrationService;
+import com.yalcap.definition.form.load.FormLoadDataPhase;
+import com.yalcap.definition.form.load.FormLoadDataService;
 import com.yalcap.definition.form.load.FormLoadDataProvider;
+import com.yalcap.definition.form.load.FormLoadPhaseHandler;
 import com.yalcap.definition.form.FormDefinitionRepository;
+import com.yalcap.definition.workflow.step.DecisionStepType;
+import com.yalcap.definition.workflow.step.FormStepType;
+import com.yalcap.definition.workflow.step.ServiceStepType;
+import com.yalcap.definition.workflow.step.StepTypeRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import tools.jackson.databind.JsonNode;
@@ -28,13 +34,20 @@ class WorkflowDefinitionServiceTest {
     private final FormDefinitionRepository formRepository = Mockito.mock(FormDefinitionRepository.class);
     private final AssetFileRepository assetFileRepository = Mockito.mock(AssetFileRepository.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final FormLoadDataHydrationService hydrationService = new FormLoadDataHydrationService(List.of(), objectMapper);
+    private final FormLoadDataService hydrationService = new FormLoadDataService(List.of(), objectMapper);
+        private final StepTypeRegistry stepTypeRegistry = new StepTypeRegistry(List.of(
+          new FormStepType(),
+          new ServiceStepType(),
+          new DecisionStepType()
+        ));
 
     private final WorkflowDefinitionService service = new WorkflowDefinitionService(
             workflowRepository,
             formRepository,
             assetFileRepository,
           hydrationService,
+          stepTypeRegistry,
+          new WorkflowRuleEngine(objectMapper),
             objectMapper
     );
 
@@ -317,8 +330,8 @@ class WorkflowDefinitionServiceTest {
                 return "mock-provider";
             }
 
-            @Override
-            public ObjectNode load(FormLoadDataContext context) {
+          @FormLoadPhaseHandler(FormLoadDataPhase.FORM_OPEN)
+          public ObjectNode onFormOpen(FormLoadDataContext context) {
                 ObjectNode node = objectMapper.createObjectNode();
                 node.put("region", "EU");
                 return node;
@@ -329,7 +342,9 @@ class WorkflowDefinitionServiceTest {
                 workflowRepository,
                 formRepository,
                 assetFileRepository,
-                new FormLoadDataHydrationService(List.of(provider), objectMapper),
+                new FormLoadDataService(List.of(provider), objectMapper),
+          stepTypeRegistry,
+          new WorkflowRuleEngine(objectMapper),
                 objectMapper
         );
 
@@ -469,6 +484,105 @@ class WorkflowDefinitionServiceTest {
     }
 
     @Test
+    void resolveDefinitionView_appliesDerivedValueExpressionsToData() throws Exception {
+        WorkflowDefinitionEntity entity = buildEntity("derived-values", """
+                {
+                  "id": "derived-values",
+                  "controlSchema": {
+                    "layout": [
+                      {"widget": "text", "stateKey": "stepName", "pointer": "#/properties/stepName"},
+                      {"widget": "text", "stateKey": "reviewed", "pointer": "#/properties/reviewed"}
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "derive-step-name",
+                      "scope": "form",
+                      "actions": [
+                        {
+                          "kind": "derive",
+                          "target": "data.stepName",
+                          "expression": {"var": "workflow.stepId"}
+                        },
+                        {
+                          "effect": "set",
+                          "target": "data.reviewed",
+                          "value": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """);
+
+        when(workflowRepository.findByDefinitionKeyAndActiveTrue("derived-values")).thenReturn(Optional.of(entity));
+
+        WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
+        request.setStepId("review");
+
+        ObjectNode response = service.resolveDefinitionView("derived-values", request).orElseThrow();
+        ObjectNode projectedData = (ObjectNode) response.path("data");
+
+        assertEquals("review", projectedData.path("stepName").asString(""));
+        assertTrue(projectedData.path("reviewed").asBoolean(false));
+    }
+
+    @Test
+    void resolveDefinitionView_appliesRunOnInitRulesOnlyDuringInitializationPhase() throws Exception {
+        WorkflowDefinitionEntity entity = buildEntity("init-phase-rules", """
+                {
+                  "id": "init-phase-rules",
+                  "controlSchema": {
+                    "layout": [
+                      {"widget": "text", "stateKey": "serverComputed", "pointer": "#/properties/serverComputed"},
+                      {"widget": "text", "stateKey": "uiFlag", "pointer": "#/properties/uiFlag"}
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "init-derive",
+                      "scope": "form",
+                      "runOnInit": true,
+                      "actions": [
+                        {
+                          "kind": "derive",
+                          "target": "data.serverComputed",
+                          "expression": "ready"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "runtime-derive",
+                      "scope": "form",
+                      "actions": [
+                        {
+                          "kind": "derive",
+                          "target": "data.uiFlag",
+                          "expression": "always"
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """);
+
+        when(workflowRepository.findByDefinitionKeyAndActiveTrue("init-phase-rules")).thenReturn(Optional.of(entity));
+
+        WorkflowDefinitionService.ResolveDefinitionViewRequest runtimeRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
+        ObjectNode runtimeResponse = service.resolveDefinitionView("init-phase-rules", runtimeRequest).orElseThrow();
+
+        assertFalse(runtimeResponse.path("data").has("serverComputed"));
+        assertEquals("always", runtimeResponse.path("data").path("uiFlag").asString(""));
+
+        WorkflowDefinitionService.ResolveDefinitionViewRequest initRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
+        initRequest.setFormInitialization(true);
+        ObjectNode initResponse = service.resolveDefinitionView("init-phase-rules", initRequest).orElseThrow();
+
+        assertEquals("ready", initResponse.path("data").path("serverComputed").asString(""));
+        assertEquals("always", initResponse.path("data").path("uiFlag").asString(""));
+    }
+
+    @Test
     void publishDefinition_rejectsRepeatWithMoreThanOneChild() throws Exception {
         JsonNode definition = objectMapper.readTree("""
                 {
@@ -522,6 +636,149 @@ class WorkflowDefinitionServiceTest {
         );
 
         assertTrue(ex.getMessage().contains("must be a group or scalar control for repeat widget"));
+    }
+
+    @Test
+    void publishDefinition_rejectsUnregisteredStepType() throws Exception {
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "steps": [
+                    {"id": "s1", "type": "custom-step", "title": "Custom"}
+                  ],
+                  "dataSchema": {"type":"object"},
+                  "controlSchema": {"layout": []}
+                }
+                """);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.publishDefinition("wf-unknown-step", definition, "tester", "unknown")
+        );
+
+        assertEquals("steps[0].type is not registered: custom-step", ex.getMessage());
+    }
+
+    @Test
+    void publishDefinition_acceptsRegisteredStepTypes() throws Exception {
+        when(workflowRepository.findByDefinitionKeyAndActiveTrue("wf-known-step-types")).thenReturn(Optional.empty());
+        when(workflowRepository.save(Mockito.any(WorkflowDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "steps": [
+                    {
+                      "id": "s1",
+                      "type": "form",
+                      "title": "Form",
+                      "config": {
+                        "assigneeKind": "INTERNAL_USER",
+                        "assigneeValue": "alice"
+                      }
+                    },
+                    {"id": "s2", "type": "service", "title": "Service"},
+                    {
+                      "id": "s3",
+                      "type": "decision",
+                      "title": "Decision",
+                      "config": {
+                        "conditionJson": "{\\\"==\\\":[{\\\"var\\\":\\\"data.status\\\"},\\\"approved\\\"]}",
+                        "action1Label": "Approve",
+                        "action2Label": "Reject"
+                      }
+                    }
+                  ],
+                  "dataSchema": {"type":"object"},
+                  "controlSchema": {"layout": []}
+                }
+                """);
+
+        WorkflowDefinitionEntity published = service.publishDefinition("wf-known-step-types", definition, "tester", "known");
+        assertEquals("wf-known-step-types", published.getDefinitionKey());
+    }
+
+    @Test
+    void publishDefinition_rejectsFormStepWithInvalidAssigneeKind() throws Exception {
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "steps": [
+                    {
+                      "id": "s1",
+                      "type": "form",
+                      "title": "Form",
+                      "config": {
+                        "assigneeKind": "BOGUS",
+                        "assigneeValue": "user-1"
+                      }
+                    }
+                  ],
+                  "dataSchema": {"type":"object"},
+                  "controlSchema": {"layout": []}
+                }
+                """);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.publishDefinition("wf-invalid-form-assignee", definition, "tester", "invalid")
+        );
+
+        assertTrue(ex.getMessage().contains("steps[0] assignee kind is invalid"));
+    }
+
+    @Test
+    void publishDefinition_rejectsDecisionStepWithInvalidConditionJson() throws Exception {
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "steps": [
+                    {
+                      "id": "s1",
+                      "type": "decision",
+                      "title": "Decision",
+                      "config": {
+                        "conditionJson": "{bad-json",
+                        "action1Label": "Approve",
+                        "action2Label": "Reject"
+                      }
+                    }
+                  ],
+                  "dataSchema": {"type":"object"},
+                  "controlSchema": {"layout": []}
+                }
+                """);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.publishDefinition("wf-invalid-decision-condition", definition, "tester", "invalid")
+        );
+
+        assertTrue(ex.getMessage().contains("steps[0].config.conditionJson is invalid JSON"));
+    }
+
+    @Test
+    void publishDefinition_acceptsDecisionStepWithLegacyConditionObject() throws Exception {
+        when(workflowRepository.findByDefinitionKeyAndActiveTrue("wf-legacy-decision-condition")).thenReturn(Optional.empty());
+        when(workflowRepository.save(Mockito.any(WorkflowDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        JsonNode definition = objectMapper.readTree("""
+                {
+                  "steps": [
+                    {
+                      "id": "s1",
+                      "type": "decision",
+                      "title": "Decision",
+                      "condition": {"==": [{"var":"data.status"}, "approved"]},
+                      "transitions": {
+                        "output_1": "s2",
+                        "output_2": "s3"
+                      }
+                    }
+                  ],
+                  "dataSchema": {"type":"object"},
+                  "controlSchema": {"layout": []}
+                }
+                """);
+
+        WorkflowDefinitionEntity published = service.publishDefinition("wf-legacy-decision-condition", definition, "tester", "legacy");
+        assertEquals("wf-legacy-decision-condition", published.getDefinitionKey());
     }
 
     private WorkflowDefinitionEntity buildEntity(String definitionKey, String definitionJson) throws Exception {

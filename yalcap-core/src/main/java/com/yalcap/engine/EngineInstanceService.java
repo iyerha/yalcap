@@ -1,7 +1,7 @@
 package com.yalcap.engine;
 
 import com.yalcap.definition.form.load.FormLoadDataContext;
-import com.yalcap.definition.form.load.FormLoadDataHydrationService;
+import com.yalcap.definition.form.load.FormLoadDataService;
 import com.yalcap.definition.form.load.FormLoadDataPhase;
 import com.yalcap.persistence.WorkflowInstanceEntity;
 import com.yalcap.persistence.WorkflowInstanceRepository;
@@ -19,12 +19,12 @@ import java.util.UUID;
 public class EngineInstanceService {
 
     private final WorkflowInstanceRepository workflowInstanceRepository;
-    private final FormLoadDataHydrationService formLoadDataHydrationService;
+    private final FormLoadDataService formLoadDataHydrationService;
     private final WorkflowTaskLifecycleService workflowTaskLifecycleService;
     private final ObjectMapper objectMapper;
 
     public EngineInstanceService(WorkflowInstanceRepository workflowInstanceRepository,
-                                 FormLoadDataHydrationService formLoadDataHydrationService,
+                                 FormLoadDataService formLoadDataHydrationService,
                                  WorkflowTaskLifecycleService workflowTaskLifecycleService,
                                  ObjectMapper objectMapper) {
         this.workflowInstanceRepository = workflowInstanceRepository;
@@ -51,7 +51,7 @@ public class EngineInstanceService {
         ObjectNode instanceData = asObjectNode(instance.getData()).deepCopy();
         ObjectNode mergedInput = mergeData(instanceData, asObjectNode(command.inputData()));
 
-        ObjectNode hydratedData = formLoadDataHydrationService.hydrate(
+        ObjectNode hydratedData = formLoadDataHydrationService.load(
                 new FormLoadDataContext(
                         command.definitionKey(),
                         command.stepId(),

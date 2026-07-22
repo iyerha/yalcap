@@ -260,6 +260,38 @@
             return '';
         },
 
+        parseDerivedExpressionText(raw) {
+            const text = String(raw || '').trim();
+            if (!text) {
+                return null;
+            }
+
+            if (text.startsWith('{') || text.startsWith('[')) {
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            if (text === 'true') {
+                return true;
+            }
+            if (text === 'false') {
+                return false;
+            }
+            if (text === 'null') {
+                return null;
+            }
+
+            const asNumber = Number(text);
+            if (!Number.isNaN(asNumber) && text !== '') {
+                return asNumber;
+            }
+
+            return text;
+        },
+
         parseRuleLiteral(raw) {
             const text = String(raw || '').trim();
             if (text === '') {
@@ -416,7 +448,8 @@
         buildActionsFromDecisionTable(rule, actionColumns = this.decisionActionColumns) {
             const actions = [];
             actionColumns.forEach((column) => {
-                const kind = String(column?.kind || 'ui').trim().toLowerCase() === 'api' ? 'api' : 'ui';
+                const kindRaw = String(column?.kind || 'ui').trim().toLowerCase();
+                const kind = kindRaw === 'api' ? 'api' : (kindRaw === 'derive' ? 'derive' : 'ui');
                 const cell = String(rule?.decisionActions?.[column.id] || '').trim().toLowerCase();
                 if (cell !== 'true' && cell !== 'false') {
                     return;
@@ -438,6 +471,30 @@
                         target: String(column?.apiTarget || '').trim(),
                         swap: String(column?.apiSwap || 'innerHTML').trim() || 'innerHTML',
                         valsTemplate: String(column?.apiValsTemplate || '').trim()
+                    });
+                    return;
+                }
+
+                if (kind === 'derive') {
+                    if (cell !== 'true') {
+                        return;
+                    }
+
+                    const target = String(column?.deriveTarget || column?.target || '').trim();
+                    if (!target) {
+                        return;
+                    }
+
+                    const expression = this.parseDerivedExpressionText(column?.deriveExpression || '');
+                    if (expression === null || expression === undefined) {
+                        return;
+                    }
+
+                    actions.push({
+                        kind: 'derive',
+                        effect: 'set',
+                        target,
+                        expression
                     });
                     return;
                 }

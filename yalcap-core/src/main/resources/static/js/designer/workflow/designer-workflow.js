@@ -1,6 +1,18 @@
+window.yalcapWorkflowStepHooks = window.yalcapWorkflowStepHooks || {};
+window.yalcapRegisterWorkflowStepHook = function yalcapRegisterWorkflowStepHook(type, hook) {
+    const key = String(type || '').trim().toLowerCase();
+    if (!key || !hook || typeof hook !== 'object') {
+        return;
+    }
+
+    const existing = window.yalcapWorkflowStepHooks[key] || {};
+    window.yalcapWorkflowStepHooks[key] = Object.assign({}, existing, hook);
+};
+
 function workflowDesigner() {
     const designer = {
         definitionKey: 'example-review',
+        stepTypes: [],
         steps: [],
         selectedNodeId: null,
         definitionJson: '',
@@ -22,13 +34,52 @@ function workflowDesigner() {
         canvasInteractionsBound: false,
         isHydratingGraph: false,
 
+        getStepHook(type) {
+            const key = String(type || '').trim().toLowerCase();
+            if (!key) {
+                return null;
+            }
+
+            const hooks = window.yalcapWorkflowStepHooks || {};
+            const hook = hooks[key];
+            return hook && typeof hook === 'object' ? hook : null;
+        },
+
+        invokeStepHook(type, eventName, payload) {
+            const hook = this.getStepHook(type);
+            if (!hook) {
+                return;
+            }
+
+            const callback = hook[eventName];
+            if (typeof callback !== 'function') {
+                return;
+            }
+
+            try {
+                callback(Object.assign({ designer: this }, payload || {}));
+            } catch (error) {
+                console.warn('Workflow step hook failed for', type, eventName, error);
+            }
+        },
+
         init() {
             this.definitionKey = window.workflowDesignerInitialKey || this.definitionKey;
+            this.stepTypes = Array.isArray(window.workflowDesignerStepTypes) ? window.workflowDesignerStepTypes : [];
+            if (!this.stepTypes.length) {
+                this.stepTypes = [{
+                    type: 'form',
+                    displayName: 'Form Step',
+                    outputCount: 1,
+                    configSchema: { type: 'object', properties: {} },
+                    defaultConfig: {}
+                }];
+            }
             const initial = window.workflowDesignerInitialDefinition;
             if (initial && Array.isArray(initial.steps) && initial.steps.length > 0) {
                 this.steps = initial.steps.map((s, idx) => this.normalizeStep(s, idx));
             } else {
-                this.steps = [this.normalizeStep({ type: 'form' }, 1)];
+                this.steps = [this.normalizeStep({ type: this.stepTypes[0].type }, 1)];
             }
             this.refreshSelectedStepView();
             this.bindPublishForm();
@@ -56,7 +107,7 @@ function workflowDesigner() {
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: '{}'
+                    body: JSON.stringify({ formInitialization: true })
                 });
 
                 const html = await response.text();

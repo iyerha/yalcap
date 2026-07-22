@@ -36,6 +36,7 @@ import java.util.Set;
 public class WorkflowDefinitionController {
 
     private static final Set<String> RTL_LANGUAGES = Set.of("ar", "fa", "he", "ur");
+    private static final String SHARED_RUNTIME_PRINT_CSS = "/css/runtime/runtime-print.css";
 
     private final WorkflowDefinitionService definitionService;
     private final ControlTypeRegistry controlTypeRegistry;
@@ -84,6 +85,7 @@ public class WorkflowDefinitionController {
         Locale locale = LocaleContextHolder.getLocale();
         ControlTextDirection direction = inferDirection(locale);
         AssetCollector assets = new AssetCollector();
+        assets.addRuntimeCss(SHARED_RUNTIME_PRINT_CSS);
         model.addAttribute("definitionKey", definitionKey);
         model.addAttribute("controls", mapRenderedControls(layout, locale, direction, assets));
         model.addAttribute("runtimeJsAssets", assets.runtimeJs());
@@ -229,6 +231,13 @@ public class WorkflowDefinitionController {
 
         private List<String> runtimeCss() {
             return List.copyOf(runtimeCss);
+        }
+
+        private void addRuntimeCss(String asset) {
+            String value = trimValue(asset);
+            if (!value.isEmpty()) {
+                runtimeCss.add(value);
+            }
         }
 
         private void addAll(Set<String> target, List<String> source) {

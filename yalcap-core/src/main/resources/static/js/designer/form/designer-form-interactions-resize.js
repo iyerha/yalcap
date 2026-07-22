@@ -4,7 +4,7 @@
 
     const resizeInteractionsApi = /** @type {Record<string, any>} */ ({
         startResize(controlId, event) {
-            const found = this.findControlById(controlId);
+            const found = this.findControlByLocalId(controlId);
             if (!found) {
                 return;
             }
