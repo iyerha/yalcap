@@ -241,6 +241,9 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
+                  name: attributes
+                  type: jsonb
+              - column:
                   name: created_at
                   type: timestamp with time zone
                   defaultValueComputed: CURRENT_TIMESTAMP

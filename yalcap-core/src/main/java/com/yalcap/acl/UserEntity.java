@@ -1,6 +1,9 @@
 package com.yalcap.acl;
 
 import com.yalcap.persistence.TenantAware;
+
+import tools.jackson.databind.JsonNode;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
@@ -36,6 +39,9 @@ public class UserEntity implements TenantAware {
     private String externalRef;
 
     private String status;
+
+    @Column("attributes")
+    private JsonNode attributes;
 
     @Column("created_at")
     private OffsetDateTime createdAt;
@@ -115,6 +121,14 @@ public class UserEntity implements TenantAware {
         this.status = status;
     }
 
+    public JsonNode getAttributes() {
+        return attributes;
+    }
+
+    public void setAttributes(JsonNode attributes) {
+        this.attributes = attributes;
+    }
+    
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
