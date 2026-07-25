@@ -1,6 +1,9 @@
 package com.yalcap.asset;
 
-import com.yalcap.persistence.TenantContext;
+import com.yalcap.asset.internal.AssetFileEntity;
+import com.yalcap.asset.internal.AssetFileRepository;
+import com.yalcap.tenant.TenantContext;
+
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,6 +38,17 @@ public class AssetStorageService {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.binaryStore = binaryStore;
+    }
+
+    public Optional<AssetUploadResult> getAsset(String assetKey, Integer version) {
+        if (!StringUtils.hasText(assetKey)) {
+            return Optional.empty();
+        }
+        if (version != null) {
+            return repository.findByAssetKeyAndVersionNumber(assetKey, version).map(a -> new AssetUploadResult(a));
+        } else {
+            return repository.findTopByAssetKeyOrderByVersionNumberDesc(assetKey).map(a -> new AssetUploadResult(a));
+        }
     }
 
     public AssetUploadResult store(MultipartFile file, String requestedAssetKey, String createdBy) {

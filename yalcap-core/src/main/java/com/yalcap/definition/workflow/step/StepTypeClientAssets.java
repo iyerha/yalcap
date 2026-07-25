@@ -39,7 +39,7 @@ public record StepTypeClientAssets(
 
         return java.util.Arrays.stream(assets)
                 .filter(item -> item != null && !item.trim().isEmpty())
-                .map(String::trim)
+                .map(item -> item.trim())
                 .distinct()
                 .toList();
     }

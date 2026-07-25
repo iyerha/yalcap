@@ -5,6 +5,8 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.MappedCollection;
 import org.springframework.data.relational.core.mapping.Table;
 
+import com.yalcap.tenant.TenantAware;
+
 import tools.jackson.databind.JsonNode;
 
 import java.util.LinkedHashSet;

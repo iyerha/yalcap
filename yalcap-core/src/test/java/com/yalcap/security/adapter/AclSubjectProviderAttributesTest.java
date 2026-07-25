@@ -13,7 +13,6 @@ import org.mockito.Mockito;
 import com.yalcap.acl.GroupRepository;
 import com.yalcap.acl.UserEntity;
 import com.yalcap.acl.UserRepository;
-import com.yalcap.acl.external.ExternalParticipantRepository;
 import com.yalcap.security.SubjectIdentity;
 import com.yalcap.security.SubjectReference;
 import com.yalcap.security.SubjectRequestContext;
@@ -26,12 +25,10 @@ import tools.jackson.databind.node.ObjectNode;
 class AclSubjectProviderAttributesTest {
         private final UserRepository userRepository = Mockito.mock(UserRepository.class);
     private final GroupRepository groupRepository = Mockito.mock(GroupRepository.class);
-    private final ExternalParticipantRepository externalParticipantRepository = Mockito.mock(ExternalParticipantRepository.class);
 
     private final AclSubjectProvider provider = new AclSubjectProvider(
             userRepository,
             groupRepository,
-            externalParticipantRepository,
             new ObjectMapper()
     );
 

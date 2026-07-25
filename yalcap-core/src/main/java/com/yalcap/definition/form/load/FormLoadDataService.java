@@ -104,7 +104,7 @@ public class FormLoadDataService {
             }
         }
 
-        handlersByPhase.values().forEach(list -> list.sort(Comparator.comparingInt(AnnotatedHandler::order)));
+        handlersByPhase.values().forEach(list -> list.sort(Comparator.comparingInt(handler -> handler.order())));
         return handlersByPhase;
     }
 

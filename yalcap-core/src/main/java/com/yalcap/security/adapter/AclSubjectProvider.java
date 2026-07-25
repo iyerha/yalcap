@@ -4,8 +4,6 @@ import com.yalcap.acl.GroupEntity;
 import com.yalcap.acl.GroupRepository;
 import com.yalcap.acl.UserEntity;
 import com.yalcap.acl.UserRepository;
-import com.yalcap.acl.external.ExternalParticipantEntity;
-import com.yalcap.acl.external.ExternalParticipantRepository;
 import com.yalcap.security.SubjectIdentity;
 import com.yalcap.security.SubjectProvider;
 import com.yalcap.security.SubjectReference;
@@ -29,16 +27,13 @@ public class AclSubjectProvider implements SubjectProvider {
     private static final TypeReference<Map<String, Object>> ATTR_TYPE = new TypeReference<>() {};
     private final UserRepository userRepository;
     private final GroupRepository groupRepository;
-    private final ExternalParticipantRepository externalParticipantRepository;
     private final ObjectMapper objectMapper;
 
     public AclSubjectProvider(UserRepository userRepository,
                           GroupRepository groupRepository,
-                          ExternalParticipantRepository externalParticipantRepository,
                           ObjectMapper objectMapper) {
         this.userRepository = userRepository;
         this.groupRepository = groupRepository;
-        this.externalParticipantRepository = externalParticipantRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -47,7 +42,6 @@ public class AclSubjectProvider implements SubjectProvider {
         return switch (subject.subjectType()) {
             case USER -> resolveUser(subject.subjectId(), requestContext.tenantId());
             case GROUP -> resolveGroup(subject.subjectId(), requestContext.tenantId());
-            case EXTERNAL_PARTICIPANT -> resolveExternalParticipant(subject.subjectId(), requestContext.tenantId());
         };
     }
 
@@ -77,15 +71,6 @@ public class AclSubjectProvider implements SubjectProvider {
                 .map(this::toGroupIdentity);
     }
 
-    private Optional<SubjectIdentity> resolveExternalParticipant(String subjectId, UUID tenantId) {
-        if (tenantId == null) {
-            return Optional.empty();
-        }
-
-        return externalParticipantRepository.findByTenantIdAndPrimaryEmail(tenantId, subjectId)
-                .map(this::toExternalIdentity);
-    }
-
     private SubjectIdentity toUserIdentity(UserEntity entity) {
         return new SubjectIdentity(
                 new SubjectReference(SubjectType.USER, entity.getUserKey()),
@@ -113,13 +98,4 @@ public class AclSubjectProvider implements SubjectProvider {
         );
     }
 
-    private SubjectIdentity toExternalIdentity(ExternalParticipantEntity entity) {
-        return new SubjectIdentity(
-                new SubjectReference(SubjectType.EXTERNAL_PARTICIPANT, entity.getPrimaryEmail()),
-                entity.getDisplayName(),
-                entity.getPrimaryEmail(),
-                null,
-                Collections.emptyMap()
-        );
-    }
 }

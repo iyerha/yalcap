@@ -47,7 +47,7 @@ public class StepTypeRegistry {
 
     public List<StepTypeDescriptor> descriptors() {
         return byType.values().stream()
-                .map(StepType::descriptor)
+                .map(std -> std.descriptor())
                 .toList();
     }
 

@@ -14,6 +14,8 @@ import com.yalcap.persistence.WorkflowInstanceRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.context.ApplicationEventPublisher;
+
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -35,6 +37,7 @@ class WorkflowTaskLifecycleServiceTest {
     private final EventRepository eventRepository = Mockito.mock(EventRepository.class);
     private final TaskAssignmentResolver assignmentResolver = Mockito.mock(TaskAssignmentResolver.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
 
     @Test
     void createUserTaskInvokesPreTaskCreatePhaseAndPersistsAssignmentAndEvent() {
@@ -59,7 +62,8 @@ class WorkflowTaskLifecycleServiceTest {
                 eventRepository,
                 assignmentResolver,
                 hydrationService,
-                objectMapper
+                objectMapper,
+                eventPublisher
         );
 
         UUID instanceId = UUID.randomUUID();
@@ -127,7 +131,8 @@ class WorkflowTaskLifecycleServiceTest {
                 eventRepository,
                 assignmentResolver,
                 hydrationService,
-                objectMapper
+                objectMapper,
+                eventPublisher
         );
 
         UUID instanceId = UUID.randomUUID();

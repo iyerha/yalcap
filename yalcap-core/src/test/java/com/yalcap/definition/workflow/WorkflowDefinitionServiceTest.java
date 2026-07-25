@@ -1,11 +1,12 @@
 package com.yalcap.definition.workflow;
 
-import com.yalcap.asset.AssetFileRepository;
 import com.yalcap.definition.form.load.FormLoadDataContext;
 import com.yalcap.definition.form.load.FormLoadDataPhase;
 import com.yalcap.definition.form.load.FormLoadDataService;
 import com.yalcap.definition.form.load.FormLoadDataProvider;
 import com.yalcap.definition.form.load.FormLoadPhaseHandler;
+import com.yalcap.asset.AssetStorageService;
+import com.yalcap.definition.WorkflowDefinitionService;
 import com.yalcap.definition.form.FormDefinitionRepository;
 import com.yalcap.definition.workflow.step.DecisionStepType;
 import com.yalcap.definition.workflow.step.FormStepType;
@@ -13,6 +14,8 @@ import com.yalcap.definition.workflow.step.ServiceStepType;
 import com.yalcap.definition.workflow.step.StepTypeRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.context.ApplicationEventPublisher;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -32,7 +35,7 @@ class WorkflowDefinitionServiceTest {
 
     private final WorkflowDefinitionRepository workflowRepository = Mockito.mock(WorkflowDefinitionRepository.class);
     private final FormDefinitionRepository formRepository = Mockito.mock(FormDefinitionRepository.class);
-    private final AssetFileRepository assetFileRepository = Mockito.mock(AssetFileRepository.class);
+    private final AssetStorageService assetStorageService = Mockito.mock(AssetStorageService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final FormLoadDataService hydrationService = new FormLoadDataService(List.of(), objectMapper);
         private final StepTypeRegistry stepTypeRegistry = new StepTypeRegistry(List.of(
@@ -40,15 +43,17 @@ class WorkflowDefinitionServiceTest {
           new ServiceStepType(),
           new DecisionStepType()
         ));
+    private final ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
 
     private final WorkflowDefinitionService service = new WorkflowDefinitionService(
             workflowRepository,
             formRepository,
-            assetFileRepository,
+            assetStorageService,
           hydrationService,
           stepTypeRegistry,
           new WorkflowRuleEngine(objectMapper),
-            objectMapper
+            objectMapper,
+            eventPublisher
     );
 
     @Test
@@ -341,11 +346,12 @@ class WorkflowDefinitionServiceTest {
         WorkflowDefinitionService hydrationAwareService = new WorkflowDefinitionService(
                 workflowRepository,
                 formRepository,
-                assetFileRepository,
+                assetStorageService,
                 new FormLoadDataService(List.of(provider), objectMapper),
           stepTypeRegistry,
           new WorkflowRuleEngine(objectMapper),
-                objectMapper
+                objectMapper,
+                eventPublisher
         );
 
         WorkflowDefinitionEntity entity = buildEntity("hydration", """

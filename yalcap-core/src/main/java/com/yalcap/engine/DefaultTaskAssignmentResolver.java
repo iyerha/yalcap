@@ -1,8 +1,9 @@
 package com.yalcap.engine;
 
-import com.yalcap.acl.external.ExternalParticipantEntity;
-import com.yalcap.acl.external.ExternalParticipantRepository;
 import org.springframework.stereotype.Component;
+
+import com.yalcap.engine.internal.ExternalParticipantEntity;
+import com.yalcap.engine.internal.ExternalParticipantRepository;
 
 import java.time.OffsetDateTime;
 import java.util.Locale;

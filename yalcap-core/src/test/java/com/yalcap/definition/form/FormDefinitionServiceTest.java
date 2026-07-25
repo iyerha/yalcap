@@ -1,9 +1,11 @@
 package com.yalcap.definition.form;
 
-import com.yalcap.definition.form.control.AutocompleteControlType;
+import com.yalcap.definition.FormDefinitionService;
 import com.yalcap.definition.form.control.ControlTypeRegistry;
-import com.yalcap.definition.form.control.DateControlType;
-import com.yalcap.definition.form.control.DateTimeControlType;
+import com.yalcap.definition.form.control.internal.AutocompleteControlType;
+import com.yalcap.definition.form.control.internal.DateControlType;
+import com.yalcap.definition.form.control.internal.DateTimeControlType;
+
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import tools.jackson.databind.JsonNode;

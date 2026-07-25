@@ -8,12 +8,12 @@ public record ControlTypeClientAssets(
         List<String> designerCss,
         List<String> runtimeCss
 ) {
-    public static final ControlTypeClientAssets NONE = new ControlTypeClientAssets(
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of()
-    );
+        public static final ControlTypeClientAssets NONE = new ControlTypeClientAssets(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
 
         public static ControlTypeClientAssets runtimeJsOnly(String... assets) {
                 return new ControlTypeClientAssets(
@@ -58,7 +58,7 @@ public record ControlTypeClientAssets(
 
                 return java.util.Arrays.stream(assets)
                                 .filter(item -> item != null && !item.trim().isEmpty())
-                                .map(String::trim)
+                                .map(item -> item.trim())
                                 .distinct()
                                 .toList();
         }

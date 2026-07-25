@@ -10,6 +10,7 @@ import com.yalcap.persistence.EventRepository;
 import com.yalcap.persistence.WorkflowInstanceEntity;
 import com.yalcap.persistence.WorkflowInstanceRepository;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -18,7 +19,6 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -32,19 +32,22 @@ public class WorkflowTaskLifecycleService {
     private final TaskAssignmentResolver taskAssignmentResolver;
     private final FormLoadDataService formLoadDataHydrationService;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public WorkflowTaskLifecycleService(WorkflowInstanceRepository workflowInstanceRepository,
                                         AssignmentRepository assignmentRepository,
                                         EventRepository eventRepository,
                                         TaskAssignmentResolver taskAssignmentResolver,
                                         FormLoadDataService formLoadDataHydrationService,
-                                        ObjectMapper objectMapper) {
+                                        ObjectMapper objectMapper,
+                                        ApplicationEventPublisher eventPublisher) {
         this.workflowInstanceRepository = workflowInstanceRepository;
         this.assignmentRepository = assignmentRepository;
         this.eventRepository = eventRepository;
         this.taskAssignmentResolver = taskAssignmentResolver;
         this.formLoadDataHydrationService = formLoadDataHydrationService;
         this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -71,6 +74,17 @@ public class WorkflowTaskLifecycleService {
         TaskAssignmentResolution resolution = taskAssignmentResolver.resolve(tenantId, command.assignmentIntent());
         instance.setAssignee(resolution.assigneeId());
         workflowInstanceRepository.save(instance);
+        eventPublisher.publishEvent(new WorkflowInstanceSavedEvent(
+            instance.getId() == null ? null : instance.getId().toString(),
+            instance.getDefinitionId() == null ? null : instance.getDefinitionId().toString(),
+            command.definitionKey(),
+            tenantId.toString(),
+            command.stepId(),
+            instance.getCurrentStep(),
+            instance.getStatus(),
+            instance.getAssignee(),
+            instance.getData()
+        ));
 
         OffsetDateTime now = OffsetDateTime.now();
         AssignmentEntity assignment = new AssignmentEntity();

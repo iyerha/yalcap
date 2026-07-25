@@ -1,12 +1,12 @@
 package com.yalcap.acl;
 
-import com.yalcap.persistence.TenantAware;
-
 import tools.jackson.databind.JsonNode;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
+
+import com.yalcap.tenant.TenantAware;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

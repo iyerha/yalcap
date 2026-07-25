@@ -7,6 +7,10 @@ import org.springframework.data.convert.Jsr310Converters;
 import org.springframework.data.jdbc.core.convert.JdbcCustomConversions;
 import org.springframework.data.jdbc.core.mapping.JdbcValue;
 import org.springframework.data.relational.core.mapping.event.BeforeConvertCallback;
+
+import com.yalcap.tenant.TenantAware;
+import com.yalcap.tenant.TenantContext;
+
 import org.springframework.data.convert.ReadingConverter;
 import org.springframework.data.convert.WritingConverter;
 

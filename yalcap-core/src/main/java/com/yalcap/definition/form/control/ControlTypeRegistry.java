@@ -51,7 +51,7 @@ public class ControlTypeRegistry {
 
     public List<ControlTypeDescriptor> descriptors() {
         return byType.values().stream()
-                .map(ControlType::descriptor)
+                .map(ct -> ct.descriptor())
                 .toList();
     }
 

@@ -1,9 +1,10 @@
 package com.yalcap.engine;
 
-import com.yalcap.acl.external.ExternalParticipantEntity;
-import com.yalcap.acl.external.ExternalParticipantRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+
+import com.yalcap.engine.internal.ExternalParticipantEntity;
+import com.yalcap.engine.internal.ExternalParticipantRepository;
 
 import java.util.UUID;
 
