@@ -9,7 +9,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -20,7 +19,7 @@ databaseChangeLog:
                     nullable: false
               - column:
                   name: data
-                  type: jsonb
+                  type: ${json.type}
                   constraints:
                     nullable: false
               - column:
@@ -50,8 +49,6 @@ databaseChangeLog:
             referencedTableName: workflow_definition
             referencedColumnNames: id
             constraintName: fk_workflow_instance_definition
-        - sql:
-            sql: CREATE INDEX IF NOT EXISTS idx_workflow_instance_data_gin ON workflow_instance USING gin (data);
 
   - changeSet:
       id: 0005-create-workflow-instance-assignments-table
@@ -63,7 +60,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -113,7 +109,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -136,7 +131,7 @@ databaseChangeLog:
                   type: varchar(20)
               - column:
                   name: payload
-                  type: jsonb
+                  type: ${json.type}
               - column:
                   name: created_at
                   type: timestamp with time zone
@@ -160,7 +155,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -193,7 +187,7 @@ databaseChangeLog:
                   defaultValueComputed: CURRENT_TIMESTAMP
               - column:
                   name: metadata
-                  type: jsonb
+                  type: ${json.type}
         - addForeignKeyConstraint:
             baseTableName: workflow_instance_documents
             baseColumnNames: instance_id
@@ -222,13 +216,6 @@ databaseChangeLog:
             columnName: tenant_id
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_workflow_instance_tenant ON workflow_instance (tenant_id);
-        - sql:
-            sql: ALTER TABLE workflow_instance ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY workflow_instance_tenant_isolation ON workflow_instance
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0009-add-tenant-to-assignments
@@ -247,13 +234,6 @@ databaseChangeLog:
             columnName: tenant_id
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_wia_tenant_id ON workflow_instance_assignments (tenant_id);
-        - sql:
-            sql: ALTER TABLE workflow_instance_assignments ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY wia_tenant_isolation ON workflow_instance_assignments
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0010-add-tenant-to-events
@@ -272,13 +252,6 @@ databaseChangeLog:
             columnName: tenant_id
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_we_tenant_id ON workflow_events (tenant_id);
-        - sql:
-            sql: ALTER TABLE workflow_events ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY we_tenant_isolation ON workflow_events
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0011-add-tenant-to-documents
@@ -297,10 +270,3 @@ databaseChangeLog:
             columnName: tenant_id
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_wid_tenant_id ON workflow_instance_documents (tenant_id);
-        - sql:
-            sql: ALTER TABLE workflow_instance_documents ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY wid_tenant_isolation ON workflow_instance_documents
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);

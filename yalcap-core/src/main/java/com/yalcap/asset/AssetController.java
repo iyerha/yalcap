@@ -1,7 +1,5 @@
-package com.yalcap.web;
+package com.yalcap.asset;
 
-import com.yalcap.asset.AssetStorageService;
-import com.yalcap.asset.AssetUploadResult;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;

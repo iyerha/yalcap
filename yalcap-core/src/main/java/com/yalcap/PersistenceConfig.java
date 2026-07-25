@@ -1,4 +1,4 @@
-package com.yalcap.persistence;
+package com.yalcap;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -7,7 +7,9 @@ import org.springframework.data.convert.Jsr310Converters;
 import org.springframework.data.jdbc.core.convert.JdbcCustomConversions;
 import org.springframework.data.jdbc.core.mapping.JdbcValue;
 import org.springframework.data.relational.core.mapping.event.BeforeConvertCallback;
+import org.springframework.util.IdGenerator;
 
+import com.fasterxml.uuid.Generators;
 import com.yalcap.tenant.TenantAware;
 import com.yalcap.tenant.TenantContext;
 
@@ -23,6 +25,7 @@ import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Configuration
 public class PersistenceConfig {
@@ -38,6 +41,26 @@ public class PersistenceConfig {
         // include JSR-310 converters for date/time if needed
         converters.addAll(Jsr310Converters.getConvertersToRegister());
         return new JdbcCustomConversions(converters);
+    }
+
+    @Bean
+    public IdGenerator idGenerator() {
+        return new IdGenerator() {
+            @Override
+            public UUID generateId() {
+                return Generators.timeBasedGenerator().generate();
+            }
+        };
+    }
+
+    @Bean
+    public BeforeConvertCallback<IdAware> setIdBeforeConvert(IdGenerator idGenerator) {
+        return entity -> {
+            if (entity.getId() == null) {
+                entity.setId(idGenerator.generateId());
+            }
+            return entity;
+        };
     }
 
     @Bean

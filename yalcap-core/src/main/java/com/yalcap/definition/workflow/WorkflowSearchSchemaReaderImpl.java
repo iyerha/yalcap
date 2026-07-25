@@ -15,7 +15,7 @@ class WorkflowSearchSchemaReaderImpl implements WorkflowSearchSchemaReader {
 
     @Override
     public WorkflowSearchSchemaSnapshot findActiveByDefinitionKey(String definitionKey) {
-        return repository.findByDefinitionKeyAndActiveTrue(definitionKey)
+        return repository.findActiveByDefinitionKey(definitionKey)
                 .map(entity -> new WorkflowSearchSchemaSnapshot(
                         entity.getDefinitionKey(),
                         entity.getVersionNumber(),

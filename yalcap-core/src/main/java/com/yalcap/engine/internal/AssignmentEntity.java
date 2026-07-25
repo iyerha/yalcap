@@ -1,5 +1,6 @@
-package com.yalcap.persistence;
-
+package com.yalcap.engine.internal;
+import com.yalcap.IdAware;
+import com.yalcap.tenant.TenantAware;
 import com.yalcap.engine.AssigneeType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
@@ -9,7 +10,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("workflow_instance_assignments")
-public class AssignmentEntity {
+public class AssignmentEntity implements TenantAware, IdAware {
 
     @Id
     private UUID id;

@@ -38,7 +38,7 @@ public class FormDefinitionService {
     }
 
     public Optional<FormDefinitionEntity> getActiveForm(String formKey) {
-        return repository.findByFormKeyAndActiveTrue(formKey);
+        return repository.findActiveByFormKey(formKey);
     }
 
     public List<FormDefinitionEntity> getFormHistory(String formKey) {
@@ -50,7 +50,7 @@ public class FormDefinitionService {
         JsonNode preparedDefinition = prepareDefinition(definition);
         validateFormDefinition(preparedDefinition);
 
-        Optional<FormDefinitionEntity> active = repository.findByFormKeyAndActiveTrue(formKey);
+        Optional<FormDefinitionEntity> active = repository.findActiveByFormKey(formKey);
         int nextVersion = active.map(entry -> entry.getVersionNumber() + 1).orElse(1);
 
         active.ifPresent(entity -> {

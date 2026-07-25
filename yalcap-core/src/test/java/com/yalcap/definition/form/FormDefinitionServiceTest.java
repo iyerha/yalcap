@@ -5,7 +5,10 @@ import com.yalcap.definition.form.control.ControlTypeRegistry;
 import com.yalcap.definition.form.control.internal.AutocompleteControlType;
 import com.yalcap.definition.form.control.internal.DateControlType;
 import com.yalcap.definition.form.control.internal.DateTimeControlType;
+import com.yalcap.tenant.TenantContext;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import tools.jackson.databind.JsonNode;
@@ -13,6 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,19 +26,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 class FormDefinitionServiceTest {
-
+  private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private final ObjectMapper objectMapper = new ObjectMapper();
-    private final FormDefinitionRepository repository = Mockito.mock(FormDefinitionRepository.class);
+  private final FormDefinitionRepository repository = Mockito.mock(FormDefinitionRepository.class);
   private final ControlTypeRegistry controlTypeRegistry = new ControlTypeRegistry(List.of(
       new DateControlType(objectMapper),
       new DateTimeControlType(objectMapper),
       new AutocompleteControlType(objectMapper)
   ));
   private final FormDefinitionService service = new FormDefinitionService(repository, controlTypeRegistry);
+    @BeforeEach
+    void setUp() {
+        TenantContext.setTenantId(TENANT_ID);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
 
     @Test
     void publish_acceptsDateDateTimeAndAutocompleteControls() throws Exception {
-        when(repository.findByFormKeyAndActiveTrue("sample-form")).thenReturn(Optional.empty());
+        when(repository.findActiveByFormKey("sample-form")).thenReturn(Optional.empty());
         when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         JsonNode definition = objectMapper.readTree("""
@@ -69,7 +82,7 @@ class FormDefinitionServiceTest {
 
     @Test
     void publish_acceptsRemoteAutocompleteWithoutStaticOptions() throws Exception {
-        when(repository.findByFormKeyAndActiveTrue("sample-form")).thenReturn(Optional.empty());
+        when(repository.findActiveByFormKey("sample-form")).thenReturn(Optional.empty());
         when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         JsonNode definition = objectMapper.readTree("""
@@ -164,7 +177,7 @@ class FormDefinitionServiceTest {
 
     @Test
     void publish_assignsMissingControlIdsAndKeepsExistingId() throws Exception {
-        when(repository.findByFormKeyAndActiveTrue("sample-form")).thenReturn(Optional.empty());
+        when(repository.findActiveByFormKey("sample-form")).thenReturn(Optional.empty());
         when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         String existingGuid = "11111111-1111-4111-8111-111111111111";

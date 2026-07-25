@@ -9,7 +9,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -48,10 +47,3 @@ databaseChangeLog:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_external_participant_tenant_email ON external_participant (tenant_id, primary_email);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_external_participant_tenant_id ON external_participant (tenant_id);
-        - sql:
-            sql: ALTER TABLE external_participant ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY external_participant_tenant_isolation ON external_participant
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);

@@ -1,4 +1,13 @@
 databaseChangeLog:
+  - property:
+      name: json.type
+      value: jsonb
+      dbms: postgresql
+
+  - property:
+      name: json.type
+      value: json
+
   - changeSet:
       id: 0001-create-extension
       author: yalcap
@@ -16,7 +25,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -46,7 +54,7 @@ databaseChangeLog:
                   type: integer
               - column:
                   name: metadata
-                  type: jsonb
+                  type: ${json.type}
               - column:
                   name: tenant_id
                   type: uuid
@@ -63,15 +71,6 @@ databaseChangeLog:
             sql: CREATE INDEX IF NOT EXISTS idx_asset_file_key ON asset_file (asset_key);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_asset_file_tenant ON asset_file (tenant_id);
-        - sql:
-            sql: CREATE INDEX IF NOT EXISTS idx_asset_file_metadata_gin ON asset_file USING gin (metadata);
-        - sql:
-            sql: ALTER TABLE asset_file ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY asset_file_tenant_isolation ON asset_file
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0013-create-tenant-table

@@ -4,13 +4,14 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import com.yalcap.IdAware;
 import com.yalcap.tenant.TenantAware;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("external_participant")
-public class ExternalParticipantEntity implements TenantAware {
+public class ExternalParticipantEntity implements TenantAware, IdAware {
 
     @Id
     private UUID id;

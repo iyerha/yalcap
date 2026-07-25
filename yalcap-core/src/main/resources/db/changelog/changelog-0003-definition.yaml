@@ -9,7 +9,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -25,7 +24,7 @@ databaseChangeLog:
                   defaultValueBoolean: true
               - column:
                   name: definition
-                  type: jsonb
+                  type: ${json.type}
                   constraints:
                     nullable: false
               - column:
@@ -52,20 +51,6 @@ databaseChangeLog:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_workflow_definition_key_version ON workflow_definition (definition_key, version_number);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_workflow_definition_key_active ON workflow_definition (definition_key, active);
-        - sql:
-            sql: ALTER TABLE workflow_definition ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY workflow_definition_tenant_isolation ON workflow_definition
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
-
-  - changeSet:
-      id: 0003-create-gin-index
-      author: yalcap
-      changes:
-        - sql:
-            sql: CREATE INDEX IF NOT EXISTS idx_workflow_definition_definition_gin ON workflow_definition USING gin (definition);
 
   - changeSet:
       id: 0003-create-form-definition-table
@@ -77,7 +62,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -93,7 +77,7 @@ databaseChangeLog:
                   defaultValueBoolean: true
               - column:
                   name: definition
-                  type: jsonb
+                  type: ${json.type}
                   constraints:
                     nullable: false
               - column:
@@ -120,12 +104,3 @@ databaseChangeLog:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_form_definition_key_version ON form_definition (form_key, version_number);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_form_definition_key_active ON form_definition (form_key, active);
-        - sql:
-            sql: CREATE INDEX IF NOT EXISTS idx_form_definition_definition_gin ON form_definition USING gin (definition);
-        - sql:
-            sql: ALTER TABLE form_definition ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY form_definition_tenant_isolation ON form_definition
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);

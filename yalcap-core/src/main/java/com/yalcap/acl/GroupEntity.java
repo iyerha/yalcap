@@ -5,12 +5,13 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import com.yalcap.tenant.TenantAware;
+import com.yalcap.IdAware;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("user_group")
-public class GroupEntity implements TenantAware {
+public class GroupEntity implements TenantAware, IdAware {
 
     @Id
     private UUID id;

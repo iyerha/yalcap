@@ -1,5 +1,6 @@
-package com.yalcap.persistence;
+package com.yalcap.engine.internal;
 
+import com.yalcap.IdAware;
 import com.yalcap.engine.ActorType;
 import com.yalcap.tenant.TenantAware;
 
@@ -12,7 +13,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("workflow_events")
-public class EventEntity implements TenantAware {
+public class EventEntity implements TenantAware, IdAware {
 
     @Id
     private UUID id;

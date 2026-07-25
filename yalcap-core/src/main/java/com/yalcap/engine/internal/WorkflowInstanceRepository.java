@@ -1,4 +1,4 @@
-package com.yalcap.persistence;
+package com.yalcap.engine.internal;
 
 import org.springframework.data.repository.CrudRepository;
 

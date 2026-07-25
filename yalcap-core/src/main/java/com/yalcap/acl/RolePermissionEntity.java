@@ -4,12 +4,13 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import com.yalcap.IdAware;
 import com.yalcap.tenant.TenantAware;
 
 import java.util.UUID;
 
 @Table("role_permission")
-public class RolePermissionEntity implements TenantAware {
+public class RolePermissionEntity implements TenantAware, IdAware {
 
     @Id
     private UUID id;

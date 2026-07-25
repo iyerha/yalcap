@@ -10,5 +10,8 @@ public final class TenantContext {
 
     public static void setTenantId(UUID id) { TL.set(id); }
     public static Optional<UUID> getTenantId() { return Optional.ofNullable(TL.get()); }
+    public static UUID requireTenantId() {
+        return getTenantId().orElseThrow(() -> new IllegalStateException("Tenant ID not set in context"));
+    }
     public static void clear() { TL.remove(); }
 }

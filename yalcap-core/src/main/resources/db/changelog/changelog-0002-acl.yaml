@@ -9,7 +9,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -54,13 +53,6 @@ databaseChangeLog:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_project_tenant_key ON project (tenant_id, project_key);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_project_tenant_name ON project (tenant_id, name);
-        - sql:
-            sql: ALTER TABLE project ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY project_tenant_isolation ON project
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0015-create-resource-table
@@ -72,7 +64,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -136,13 +127,6 @@ databaseChangeLog:
             sql: CREATE INDEX IF NOT EXISTS idx_resource_tenant_project_type ON resource (tenant_id, project_id, resource_type);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_resource_tenant_state ON resource (tenant_id, lifecycle_state);
-        - sql:
-            sql: ALTER TABLE resource ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY resource_tenant_isolation ON resource
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0016-create-principal-group-table
@@ -154,7 +138,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -185,14 +168,7 @@ databaseChangeLog:
             constraintName: fk_user_group_tenant
         - sql:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_user_group_tenant_key ON user_group (tenant_id, group_key);
-        - sql:
-            sql: ALTER TABLE user_group ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY user_group_tenant_isolation ON user_group
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
-
+ 
   - changeSet:
       id: 0016b-create-principal-user-table
       author: yalcap
@@ -203,7 +179,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -242,7 +217,7 @@ databaseChangeLog:
                     nullable: false
               - column:
                   name: attributes
-                  type: jsonb
+                  type: ${json.type}
               - column:
                   name: created_at
                   type: timestamp with time zone
@@ -269,13 +244,6 @@ databaseChangeLog:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_user_account_tenant_source_external_ref ON user_account (tenant_id, source_type, external_ref) WHERE external_ref IS NOT NULL;
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_user_account_tenant_email ON user_account (tenant_id, primary_email);
-        - sql:
-            sql: ALTER TABLE user_account ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY user_account_tenant_isolation ON user_account
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0017-create-group-member-table
@@ -287,7 +255,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -337,14 +304,7 @@ databaseChangeLog:
             sql: CREATE INDEX IF NOT EXISTS idx_group_member_tenant_user ON group_member (tenant_id, user_key);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_group_member_tenant_user_id ON group_member (tenant_id, user_id);
-        - sql:
-            sql: ALTER TABLE group_member ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY group_member_tenant_isolation ON group_member
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
-
+ 
   - changeSet:
       id: 0018-create-role-definition-table
       author: yalcap
@@ -355,7 +315,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -391,13 +350,6 @@ databaseChangeLog:
             constraintName: fk_acl_role_tenant
         - sql:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_acl_role_tenant_key ON acl_role (tenant_id, role_key);
-        - sql:
-            sql: ALTER TABLE acl_role ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY acl_role_tenant_isolation ON acl_role
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0019-create-role-permission-table
@@ -409,7 +361,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -442,13 +393,6 @@ databaseChangeLog:
             constraintName: fk_role_permission_role
         - sql:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_permission_tenant_role_permission ON role_permission (tenant_id, role_id, permission_key);
-        - sql:
-            sql: ALTER TABLE role_permission ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY role_permission_tenant_isolation ON role_permission
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0020-create-role-assignment-table
@@ -460,7 +404,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -521,13 +464,6 @@ databaseChangeLog:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_role_assignment_tenant_scope_subject_role ON role_assignment (tenant_id, scope_resource_id, subject_type, subject_key, role_id);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_role_assignment_tenant_subject ON role_assignment (tenant_id, subject_type, subject_key);
-        - sql:
-            sql: ALTER TABLE role_assignment ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY role_assignment_tenant_isolation ON role_assignment
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);
 
   - changeSet:
       id: 0021-create-resource-grant-table
@@ -539,7 +475,6 @@ databaseChangeLog:
               - column:
                   name: id
                   type: uuid
-                  defaultValueComputed: uuidv7()
                   constraints:
                     primaryKey: true
                     nullable: false
@@ -601,10 +536,3 @@ databaseChangeLog:
             sql: CREATE UNIQUE INDEX IF NOT EXISTS ux_resource_grant_tenant_resource_subject_permission ON resource_grant (tenant_id, resource_id, subject_type, subject_key, permission_key);
         - sql:
             sql: CREATE INDEX IF NOT EXISTS idx_resource_grant_tenant_subject_resource ON resource_grant (tenant_id, subject_type, subject_key, resource_id);
-        - sql:
-            sql: ALTER TABLE resource_grant ENABLE ROW LEVEL SECURITY;
-        - sql:
-            sql: |
-              CREATE POLICY resource_grant_tenant_isolation ON resource_grant
-              USING (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid)
-              WITH CHECK (current_setting('app.tenant', true) IS NULL OR tenant_id = current_setting('app.tenant')::uuid);

@@ -21,6 +21,7 @@ import com.yalcap.definition.workflow.WorkflowRuleEngine;
 import com.yalcap.Application;
 import com.yalcap.asset.AssetStorageService;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
@@ -144,21 +145,21 @@ class DesignerControllerTest {
         @SuppressWarnings("unchecked")
         List<String> jsAssets = (List<String>) jsAssetsValue;
         assertEquals(5, jsAssets.size());
-        org.junit.jupiter.api.Assertions.assertTrue(jsAssets.contains("/js/designer/custom-a.js"));
-        org.junit.jupiter.api.Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/steps/designer-step-form.js"));
-        org.junit.jupiter.api.Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/steps/designer-step-decision.js"));
-        org.junit.jupiter.api.Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/steps/designer-step-service.js"));
-        org.junit.jupiter.api.Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/test-step.js"));
+        Assertions.assertTrue(jsAssets.contains("/js/designer/custom-a.js"));
+        Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/steps/designer-step-form.js"));
+        Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/steps/designer-step-decision.js"));
+        Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/steps/designer-step-service.js"));
+        Assertions.assertTrue(jsAssets.contains("/js/designer/workflow/test-step.js"));
 
         Object cssAssetsValue = model.asMap().get("designerCssAssets");
         assertInstanceOf(List.class, cssAssetsValue);
         @SuppressWarnings("unchecked")
         List<String> cssAssets = (List<String>) cssAssetsValue;
         assertEquals(4, cssAssets.size());
-        org.junit.jupiter.api.Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/steps/designer-step-form.css"));
-        org.junit.jupiter.api.Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/steps/designer-step-decision.css"));
-        org.junit.jupiter.api.Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/steps/designer-step-service.css"));
-        org.junit.jupiter.api.Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/test-step.css"));
+        Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/steps/designer-step-form.css"));
+        Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/steps/designer-step-decision.css"));
+        Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/steps/designer-step-service.css"));
+        Assertions.assertTrue(cssAssets.contains("/css/designer/workflow/test-step.css"));
     }
 
     private ControlType controlTypeWithAssets(String type, ControlTypeClientAssets assets) {

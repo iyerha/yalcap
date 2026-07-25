@@ -47,7 +47,7 @@ public class AssetStorageService {
         if (version != null) {
             return repository.findByAssetKeyAndVersionNumber(assetKey, version).map(a -> new AssetUploadResult(a));
         } else {
-            return repository.findTopByAssetKeyOrderByVersionNumberDesc(assetKey).map(a -> new AssetUploadResult(a));
+            return repository.findLatestByAssetKey(assetKey).map(a -> new AssetUploadResult(a));
         }
     }
 
@@ -67,12 +67,12 @@ public class AssetStorageService {
                 ? file.getOriginalFilename()
                 : "upload.bin";
         String assetKey = resolveAssetKey(requestedAssetKey, originalName);
-        int nextVersion = repository.findTopByAssetKeyOrderByVersionNumberDesc(assetKey)
+        UUID tenantId = TenantContext.getTenantId().orElse(null);
+        int nextVersion = repository.findLatestByAssetKey(assetKey)
                 .map(e -> e.getVersionNumber() == null ? 1 : e.getVersionNumber() + 1)
                 .orElse(1);
 
         String sha256 = hash(bytes);
-        UUID tenantId = TenantContext.getTenantId().orElse(null);
         String tenantSegment = tenantId != null ? tenantId.toString() : "global";
         String storageRef = binaryStore.store(tenantSegment, assetKey, nextVersion, originalName, bytes);
         Path filePath = Path.of(storageRef);

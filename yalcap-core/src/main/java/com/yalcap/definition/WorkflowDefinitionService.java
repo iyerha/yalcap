@@ -75,7 +75,7 @@ public class WorkflowDefinitionService {
     }
 
     public Optional<WorkflowDefinitionEntity> getActiveDefinition(String definitionKey) {
-        return repository.findByDefinitionKeyAndActiveTrue(definitionKey);
+        return repository.findActiveByDefinitionKey(definitionKey);
     }
 
     public List<WorkflowDefinitionEntity> getDefinitionHistory(String definitionKey) {
@@ -83,7 +83,7 @@ public class WorkflowDefinitionService {
     }
 
     public Optional<ObjectNode> resolveDefinitionView(String definitionKey, ResolveDefinitionViewRequest request) {
-        return repository.findByDefinitionKeyAndActiveTrue(definitionKey)
+        return repository.findActiveByDefinitionKey(definitionKey)
                 .map(entity -> resolveDefinitionView(entity, request));
     }
 
@@ -145,7 +145,7 @@ public class WorkflowDefinitionService {
         validateStepDefinitions(preparedDefinition);
         validateAndNormalizeRuleActions(preparedDefinition);
 
-        Optional<WorkflowDefinitionEntity> activeDefinition = repository.findByDefinitionKeyAndActiveTrue(definitionKey);
+        Optional<WorkflowDefinitionEntity> activeDefinition = repository.findActiveByDefinitionKey(definitionKey);
         int nextVersion = activeDefinition.map(entry -> entry.getVersionNumber() + 1).orElse(1);
 
         activeDefinition.ifPresent(entity -> {
@@ -451,7 +451,7 @@ public class WorkflowDefinitionService {
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "Referenced form not found: " + refFormKey + " v" + resolvedRequestedVersion))
                     : formDefinitionRepository
-                        .findByFormKeyAndActiveTrue(refFormKey)
+                        .findActiveByFormKey(refFormKey)
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "Referenced form not found (active): " + refFormKey));
 

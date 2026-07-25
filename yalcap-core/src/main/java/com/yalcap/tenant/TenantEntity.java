@@ -6,9 +6,10 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import com.yalcap.IdAware;
 
 @Table("tenant")
-public class TenantEntity {
+public class TenantEntity implements IdAware {
 
     @Id
     private UUID id;

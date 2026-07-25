@@ -1,4 +1,4 @@
-package com.yalcap.web;
+package com.yalcap.definition;
 
 import com.yalcap.definition.form.control.ControlTypeDescriptor;
 import com.yalcap.definition.form.control.ControlTypeRegistry;

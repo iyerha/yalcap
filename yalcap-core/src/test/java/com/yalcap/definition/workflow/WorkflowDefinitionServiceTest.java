@@ -12,6 +12,10 @@ import com.yalcap.definition.workflow.step.DecisionStepType;
 import com.yalcap.definition.workflow.step.FormStepType;
 import com.yalcap.definition.workflow.step.ServiceStepType;
 import com.yalcap.definition.workflow.step.StepTypeRegistry;
+import com.yalcap.tenant.TenantContext;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,6 +36,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 class WorkflowDefinitionServiceTest {
+    private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @BeforeEach
+    void setTenant() {
+        TenantContext.setTenantId(TENANT_ID);
+    }
+
+    @AfterEach
+    void clearTenant() {
+        TenantContext.clear();
+    }
 
     private final WorkflowDefinitionRepository workflowRepository = Mockito.mock(WorkflowDefinitionRepository.class);
     private final FormDefinitionRepository formRepository = Mockito.mock(FormDefinitionRepository.class);
@@ -76,7 +91,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("sample")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("sample")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         request.setStepId("review");
@@ -118,7 +133,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("approval-flow")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("approval-flow")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest financeRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         financeRequest.setUserGroups(List.of("finance", "audit"));
@@ -151,7 +166,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("hidden")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("hidden")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         request.setData(objectMapper.readTree("{\"token\":\"abc\"}"));
@@ -181,7 +196,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("permissions")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("permissions")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest editorRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         editorRequest.setUserId("editor");
@@ -224,7 +239,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("nested")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("nested")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         request.setData(objectMapper.readTree("""
@@ -274,7 +289,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("json-logic")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("json-logic")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest reviewRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         reviewRequest.setStepId("review");
@@ -314,7 +329,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("multi-actions")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("multi-actions")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         request.setStepId("review");
@@ -375,7 +390,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("hydration")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("hydration")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         request.setData(objectMapper.createObjectNode());
@@ -428,7 +443,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("section-collapse")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("section-collapse")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest reviewerRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         reviewerRequest.setStepId("review");
@@ -476,7 +491,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("table-column-visibility")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("table-column-visibility")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         request.setStepId("review");
@@ -521,7 +536,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("derived-values")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("derived-values")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest request = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         request.setStepId("review");
@@ -572,7 +587,7 @@ class WorkflowDefinitionServiceTest {
                 }
                 """);
 
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("init-phase-rules")).thenReturn(Optional.of(entity));
+        when(workflowRepository.findActiveByDefinitionKey("init-phase-rules")).thenReturn(Optional.of(entity));
 
         WorkflowDefinitionService.ResolveDefinitionViewRequest runtimeRequest = new WorkflowDefinitionService.ResolveDefinitionViewRequest();
         ObjectNode runtimeResponse = service.resolveDefinitionView("init-phase-rules", runtimeRequest).orElseThrow();
@@ -666,7 +681,7 @@ class WorkflowDefinitionServiceTest {
 
     @Test
     void publishDefinition_acceptsRegisteredStepTypes() throws Exception {
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("wf-known-step-types")).thenReturn(Optional.empty());
+        when(workflowRepository.findActiveByDefinitionKey("wf-known-step-types")).thenReturn(Optional.empty());
         when(workflowRepository.save(Mockito.any(WorkflowDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         JsonNode definition = objectMapper.readTree("""
@@ -761,7 +776,7 @@ class WorkflowDefinitionServiceTest {
 
     @Test
     void publishDefinition_acceptsDecisionStepWithLegacyConditionObject() throws Exception {
-        when(workflowRepository.findByDefinitionKeyAndActiveTrue("wf-legacy-decision-condition")).thenReturn(Optional.empty());
+        when(workflowRepository.findActiveByDefinitionKey("wf-legacy-decision-condition")).thenReturn(Optional.empty());
         when(workflowRepository.save(Mockito.any(WorkflowDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         JsonNode definition = objectMapper.readTree("""

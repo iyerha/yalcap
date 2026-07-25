@@ -4,6 +4,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import com.yalcap.IdAware;
 import com.yalcap.tenant.TenantAware;
 
 import tools.jackson.databind.JsonNode;
@@ -12,7 +13,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("form_definition")
-public class FormDefinitionEntity implements TenantAware {
+public class FormDefinitionEntity implements TenantAware, IdAware {
 
     @Id
     private UUID id;

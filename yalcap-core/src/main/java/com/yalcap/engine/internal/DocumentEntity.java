@@ -1,9 +1,10 @@
-package com.yalcap.persistence;
+package com.yalcap.engine.internal;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import com.yalcap.IdAware;
 import com.yalcap.tenant.TenantAware;
 
 import tools.jackson.databind.JsonNode;
@@ -12,7 +13,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Table("workflow_instance_documents")
-public class DocumentEntity implements TenantAware {
+public class DocumentEntity implements TenantAware, IdAware {
 
     @Id
     private UUID id;

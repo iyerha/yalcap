@@ -37,7 +37,7 @@ class FormLoadDataServiceTest {
     }
 
     @Test
-        void constructor_rejectsProviderWithoutAnnotatedHandlers() {
+    void constructor_rejectsProviderWithoutAnnotatedHandlers() {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
             () -> new FormLoadDataService(List.of(new NoAnnotationProvider()), objectMapper));
 
