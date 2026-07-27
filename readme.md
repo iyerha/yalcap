@@ -1,19 +1,17 @@
 # YALCAP
 
-YALCAP is a minimalist framework for developers who build enterprise applications and workflows.
+YALCAP is a minimalist, developer-first framework for building enterprise applications and workflows without traditional CRUD boilerplate or relational data modeling.
 
-The goal is to remove boilerplate and heavy lifting so teams can focus on business logic, domain rules, and delivery speed.
+Instead of forcing teams into proprietary low-code tools or heavy visual modeling black boxes, YALCAP introduces a text-based, code-first alternative driven by pure HTML (htmx), human-readable YAML configurations, and search-first document indexing.
 
 ## Vision
 
-Enterprise workflow systems are often weighed down by repetitive platform code.
-
-YALCAP aims to provide a clean, composable foundation where:
-
-- workflow and form behavior are explicit and versioned
-- runtime rules are first-class and testable
-- infrastructure concerns are pre-wired with practical defaults
-- developers stay in control of code, rather than being locked into opaque tooling
+Enterprise applications are often weighed down by repetitive data-mapping layers, rigid database schemas, and fragile synchronization loops. YALCAP eliminates this heavy lifting by providing a composable foundation where:
+- Document-Envelope Architecture: Workflows are treated as evolving folders containing independent, form-specific JSON documents.
+- Zero Database Migrations: Data is captured dynamically into an append-only ledger via standard HTML input names.
+- No Intermediate JSON UI Schemas: Visual interfaces are written in native, semantic HTML/Thymeleaf templates using standard htmx for real-time behavior.
+- Unified Search-First Indexing: All workflow documents are automatically structured into single root flow indexes with nested child document segments in Apache Solr, Elasticsearch, or OpenSearch.
+- Version Control Harmony: Every form template, business validation rule, and routing path is a flat text file, guaranteeing clean Git diffs and zero visual merge conflicts.
 
 ## Guiding Principles
 
