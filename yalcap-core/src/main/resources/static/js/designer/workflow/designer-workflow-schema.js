@@ -26,12 +26,6 @@ window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target
                 : {};
             const config = Object.assign({}, defaults, incomingConfig);
 
-            if (String(type || '').trim() === 'form') {
-                const assignee = step && step.assignee && typeof step.assignee === 'object' ? step.assignee : {};
-                config.assigneeKind = String(assignee.kind || config.assigneeKind || 'INTERNAL_USER').trim();
-                config.assigneeValue = String(assignee.value || config.assigneeValue || '').trim();
-            }
-
             if (String(type || '').trim() === 'decision') {
                 const transitionLabels = step && step.transitionLabels && typeof step.transitionLabels === 'object'
                     ? step.transitionLabels
@@ -48,38 +42,55 @@ window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target
 
         normalizeStep(step, idx) {
             const normalizedType = (step.type || (this.stepTypes[0] && this.stepTypes[0].type) || 'form').trim();
-            const resolvedNext = this.resolveNextStepId(step);
-            const transitions = step && step.transitions;
-            const transitionLabels = step && step.transitionLabels;
-            const designer = step && step.designer && typeof step.designer === 'object' && !Array.isArray(step.designer)
-                ? step.designer
+            const routing = step && step.routing && typeof step.routing === 'object' && !Array.isArray(step.routing)
+                ? step.routing
                 : {};
-            const rawPosition = designer.position || (step && step.position) || {};
+            const transitions = routing.transitions && typeof routing.transitions === 'object' && !Array.isArray(routing.transitions)
+                ? routing.transitions
+                : (step && step.transitions && typeof step.transitions === 'object' && !Array.isArray(step.transitions) ? step.transitions : {});
+            const ui = step && step.ui && typeof step.ui === 'object' && !Array.isArray(step.ui) ? step.ui : {};
+            const uiDesigner = ui.designer && typeof ui.designer === 'object' && !Array.isArray(ui.designer) ? ui.designer : {};
+            const rawPosition = uiDesigner.position || (step && step.position) || {};
+            const assignment = step && step.assignment && typeof step.assignment === 'object' && !Array.isArray(step.assignment)
+                ? step.assignment
+                : {};
+            const access = step && step.access && typeof step.access === 'object' && !Array.isArray(step.access)
+                ? step.access
+                : {};
+
             return {
                 id: (step.id || ('step-' + idx)).trim(),
                 title: (step.title || '').trim(),
                 type: normalizedType,
                 config: this.createInitialConfig(step, normalizedType),
-                assignee: {
-                    kind: ((step.assignee && step.assignee.kind) || 'INTERNAL_USER').trim(),
-                    value: ((step.assignee && step.assignee.value) || '').trim()
+                assignment: {
+                    kind: String(assignment.kind || 'INTERNAL_USER').trim(),
+                    value: String(assignment.value || '').trim(),
+                    mode: String(assignment.mode || 'first-wins').trim(),
+                    multiInstance: Boolean(assignment.multiInstance)
                 },
-                next: resolvedNext,
-                transitions: transitions && typeof transitions === 'object' && !Array.isArray(transitions)
-                    ? Object.assign({}, transitions)
-                    : {},
-                transitionLabels: transitionLabels && typeof transitionLabels === 'object' && !Array.isArray(transitionLabels)
-                    ? Object.assign({}, transitionLabels)
+                access: {
+                    groups: Array.isArray(access.groups) ? access.groups.map((v) => String(v || '').trim()).filter(Boolean) : [],
+                    users: Array.isArray(access.users) ? access.users.map((v) => String(v || '').trim()).filter(Boolean) : []
+                },
+                ui: {
+                    pointer: String((ui.pointer || step.uiPointer || '')).trim(),
+                    designer: {
+                        position: {
+                            x: Number(rawPosition.x) || (80 + (idx * 160)),
+                            y: Number(rawPosition.y) || 120
+                        }
+                    }
+                },
+                routing: {
+                    transitions: Object.assign({}, transitions)
+                },
+                transitionLabels: step && step.transitionLabels && typeof step.transitionLabels === 'object' && !Array.isArray(step.transitionLabels)
+                    ? Object.assign({}, step.transitionLabels)
                     : {},
                 condition: step && step.condition && typeof step.condition === 'object' && !Array.isArray(step.condition)
                     ? JSON.parse(JSON.stringify(step.condition))
                     : null,
-                designer: {
-                    position: {
-                        x: Number(rawPosition.x) || (80 + (idx * 160)),
-                        y: Number(rawPosition.y) || 120
-                    }
-                },
                 nodeId: step.nodeId || null
             };
         },

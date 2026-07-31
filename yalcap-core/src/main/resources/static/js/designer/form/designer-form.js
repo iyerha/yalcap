@@ -67,7 +67,6 @@ function formDesigner() {
         resizeKeyHandler: null,
         resizeVisibilityHandler: null,
         validationErrors: [],
-        definitionJson: '',
         rules: [],
         decisionTableScope: 'form',
         decisionTableDescription: '',
@@ -77,6 +76,8 @@ function formDesigner() {
         decisionTables: [],
         activeDecisionTableId: null,
         nextDecisionTableSeq: 1,
+        controlSchemaHtml: '',
+        dataSchemaYaml: '',
 
         ...controlsApi,
         ...schemaApi,
@@ -288,26 +289,6 @@ function formDesigner() {
             if (this.selectedControlLocalId === localId) {
                 this.selectedControlLocalId = null;
                 this.selectedControl = null;
-            }
-        },
-
-        initFromDefinitionJson() {
-            const definitionField = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('definition-json'));
-            if (!definitionField) {
-                return;
-            }
-
-            const raw = String(definitionField.value || '').trim();
-            if (!raw) {
-                return;
-            }
-
-            try {
-                const definition = JSON.parse(raw);
-                this.loadDefinition(definition);
-                this.definitionJson = JSON.stringify(definition, null, 2);
-            } catch (_err) {
-                this.definitionJson = raw;
             }
         },
 
@@ -914,7 +895,205 @@ function formDesigner() {
                 required: column.required === true,
                 visible: column.visible !== false
             }));
+        },
+
+    generate() {
+        // Generate controlSchema (HTML from controls)
+        this.controlSchemaHtml = this.generateControlSchema();
+        
+        // Generate dataSchema (YAML from properties)
+        this.dataSchemaYaml = this.generateDataSchema();
+    },
+
+    generateControlSchema() {
+        const controlsHtml = this.controls
+            .map(control => this.controlToHtml(control, 1))
+            .join('\n');
+        return `<form th:fragment="form">\n${controlsHtml}\n</form>`;
+    },
+
+    generateDataSchema() {
+        const properties = this.buildSchemaProperties();
+        return this.toYaml({ properties });
+    },
+
+    buildSchemaProperties() {
+        const properties = {};
+        this.controls.forEach(control => {
+            this.addControlToSchema(properties, control);
+        });
+        return properties;
+    },
+
+    addControlToSchema(properties, control) {
+        if (!control.stateKey || !control.name) {
+            return;
         }
+        
+        const widget = String(control.widget || 'text');
+        if (widget === 'section' || widget === 'group' || widget === 'button' || widget === 'message') {
+            // Don't create schema entries for layout/action-only controls
+            if (widget === 'group' || widget === 'section') {
+                const groupSchema = { type: 'object', properties: {} };
+                if (Array.isArray(control.children)) {
+                    control.children.forEach(child => {
+                        this.addControlToSchema(groupSchema.properties, child);
+                    });
+                }
+                properties[control.stateKey] = groupSchema;
+            }
+            return;
+        }
+        
+        const schemaType = this.inferSchemaType(null, control);
+        const prop = { type: schemaType };
+        
+        if (control.required) {
+            prop.required = true;
+        }
+        
+        if (control.hint) {
+            prop.description = control.hint;
+        }
+        
+        if (control.placeholder) {
+            prop.placeholder = control.placeholder;
+        }
+        
+        if (control.defaultValue !== undefined && control.defaultValue !== '' && control.defaultValue !== null) {
+            prop.default = control.defaultValue;
+        }
+        
+        // Add enum for select/radio/checkbox if options exist
+        if (Array.isArray(control.options) && control.options.length > 0) {
+            prop.enum = control.options.map(opt => opt.value);
+        }
+        
+        properties[control.stateKey] = prop;
+    },
+
+    controlToHtml(control, indentLevel = 1) {
+        const indent = ' '.repeat(indentLevel * 2);
+        const widget = String(control.widget || 'text');
+        const name = control.stateKey || control.name || '';
+        
+        if (widget === 'section') {
+            const childrenHtml = Array.isArray(control.children)
+                ? control.children.map(c => this.controlToHtml(c, indentLevel + 1)).join('\n')
+                : '';
+            return `${indent}<fieldset>\n${indent}  <legend>${control.label}</legend>\n${childrenHtml}\n${indent}</fieldset>`;
+        }
+        
+        if (widget === 'group') {
+            const childrenHtml = Array.isArray(control.children)
+                ? control.children.map(c => this.controlToHtml(c, indentLevel + 1)).join('\n')
+                : '';
+            return `${indent}<div class="form-group">\n${childrenHtml}\n${indent}</div>`;
+        }
+        
+        if (widget === 'message') {
+            return `${indent}<div class="form-message" data-tone="${control.messageTone}">${control.messageBody}</div>`;
+        }
+        
+        if (widget === 'button') {
+            return `${indent}<button type="button" class="btn btn-${control.buttonVariant}">${control.label}</button>`;
+        }
+        
+        if (widget === 'repeat' || widget === 'table') {
+            return `${indent}<div class="form-repeat" data-widget="${widget}" name="${name}"></div>`;
+        }
+        
+        // Standard input controls
+        const attrs = [`name="${name}"`];
+        if (control.required) {
+            attrs.push('required');
+        }
+        if (control.placeholder) {
+            attrs.push(`placeholder="${this.escapeHtml(control.placeholder)}"`);
+        }
+        if (control.hint) {
+            attrs.push(`title="${this.escapeHtml(control.hint)}"`);
+        }
+        
+        const attrStr = attrs.join(' ');
+        const label = control.label ? `${indent}  <label for="${name}">${this.escapeHtml(control.label)}</label>\n` : '';
+        
+        let inputHtml = '';
+        switch (widget) {
+            case 'textarea':
+                inputHtml = `${indent}  <textarea id="${name}" ${attrStr}></textarea>`;
+                break;
+            case 'select':
+            case 'radio':
+            case 'checkbox':
+                const options = Array.isArray(control.options)
+                    ? control.options.map(opt => `${indent}    <option value="${this.escapeHtml(opt.value)}">${this.escapeHtml(opt.label)}</option>`).join('\n')
+                    : '';
+                inputHtml = `${indent}  <select id="${name}" ${attrStr}>\n${options}\n${indent}  </select>`;
+                break;
+            case 'date':
+                inputHtml = `${indent}  <input type="date" id="${name}" ${attrStr} />`;
+                break;
+            case 'datetime':
+                inputHtml = `${indent}  <input type="datetime-local" id="${name}" ${attrStr} />`;
+                break;
+            case 'number':
+                inputHtml = `${indent}  <input type="number" id="${name}" ${attrStr} />`;
+                break;
+            case 'booleanCheckbox':
+                inputHtml = `${indent}  <input type="checkbox" id="${name}" ${attrStr} />`;
+                break;
+            case 'upload':
+                inputHtml = `${indent}  <input type="file" id="${name}" ${attrStr} ${control.uploadAllowMultiple ? 'multiple' : ''} />`;
+                break;
+            case 'image':
+                inputHtml = `${indent}  <img id="${name}" alt="${this.escapeHtml(control.altText)}" />`;
+                break;
+            default:
+                inputHtml = `${indent}  <input type="text" id="${name}" ${attrStr} />`;
+        }
+        
+        return `${label}${inputHtml}`;
+    },
+
+    toYaml(obj) {
+        const lines = [];
+        const stringify = (val, indent = 0) => {
+            const spaces = ' '.repeat(indent);
+            if (val === null || val === undefined) {
+                return 'null';
+            }
+            if (typeof val === 'boolean') {
+                return val ? 'true' : 'false';
+            }
+            if (typeof val === 'number') {
+                return String(val);
+            }
+            if (typeof val === 'string') {
+                return `"${val.replace(/"/g, '\\"')}"`;
+            }
+            if (Array.isArray(val)) {
+                return `[\n${val.map(item => `${spaces}  - ${stringify(item, indent + 2)}`).join('\n')}\n${spaces}]`;
+            }
+            if (typeof val === 'object') {
+                const entries = Object.entries(val).filter(([, v]) => v !== undefined);
+                return entries.map(([k, v]) => `${spaces}${k}: ${stringify(v, indent + 2)}`).join('\n');
+            }
+            return String(val);
+        };
+        
+        return stringify(obj);
+    },
+
+    escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
     };
 }
 

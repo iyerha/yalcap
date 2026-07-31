@@ -100,12 +100,14 @@ function workflowDesigner() {
                 if (!definitionKey) {
                     throw new Error('Definition key is required.');
                 }
-
+                
+                const tenantId = window.tenantId;
                 const response = await fetch('/api/definitions/' + encodeURIComponent(definitionKey) + '/resolved/html', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-Tenant-Id': tenantId
                     },
                     body: JSON.stringify({ formInitialization: true })
                 });

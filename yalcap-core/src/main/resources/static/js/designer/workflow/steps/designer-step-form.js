@@ -4,49 +4,64 @@
         return;
     }
 
-    function resolveHint(config) {
-        var values = config && typeof config === 'object' ? config : {};
-        var kind = String(values.assigneeKind || '').trim();
-        var assigneeValue = String(values.assigneeValue || '').trim();
+    function resolveHint(assignment) {
+        var values = assignment && typeof assignment === 'object' ? assignment : {};
+        var kind = String(values.kind || '').trim();
+        var value = String(values.value || '').trim();
 
         if (!kind) {
-            return 'Form step: choose an assignee kind.';
+            return 'Form step: choose an assignment kind.';
         }
 
-        if (!assigneeValue) {
-            return 'Form step: provide an assignee value for ' + kind + '.';
+        if (!value) {
+            return 'Form step: provide an assignment value for ' + kind + '.';
         }
 
-        if (kind === 'EXTERNAL_EMAIL' && assigneeValue.indexOf('@') < 0) {
+        if (kind === 'EXTERNAL_EMAIL' && value.indexOf('@') < 0) {
             return 'Form step: EXTERNAL_EMAIL usually contains an email or expression that resolves to one.';
         }
 
         return 'Form step assignment looks complete.';
     }
 
+    function ensureAssignmentObject(step) {
+        if (!step || typeof step !== 'object') {
+            return;
+        }
+
+        if (!step.assignment || typeof step.assignment !== 'object') {
+            step.assignment = {};
+        }
+    }
+
     register('form', {
+        assignmentFields: [
+            { key: 'kind', title: 'Assignment Kind', type: 'select', enumValues: ['INTERNAL_USER', 'INTERNAL_GROUP', 'EXTERNAL_EMAIL'] },
+            { key: 'value', title: 'Value', type: 'text', placeholder: 'user ID, group name, or email' },
+            { key: 'mode', title: 'Mode', type: 'select', enumValues: ['first-wins', 'parallel', 'sequential'] }
+        ],
         onSelect: function onSelect(context) {
             if (!context || !context.draft) {
                 return;
             }
 
             var draft = context.draft;
-            if (!draft.config || typeof draft.config !== 'object') {
-                draft.config = {};
-            }
+            ensureAssignmentObject(draft);
 
             if (typeof context.setHint === 'function') {
-                context.setHint(resolveHint(draft.config));
+                context.setHint(resolveHint(draft.assignment));
             }
         },
 
         afterSync: function afterSync(context) {
-            if (!context || !context.step || !context.step.config) {
+            if (!context || !context.step) {
                 return;
             }
 
+            ensureAssignmentObject(context.step);
+
             if (typeof context.setHint === 'function') {
-                context.setHint(resolveHint(context.step.config));
+                context.setHint(resolveHint(context.step.assignment));
             }
         }
     });

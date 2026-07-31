@@ -21,8 +21,11 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
     @Column("form_key")
     private String formKey;
 
-    @Column("definition")
-    private JsonNode definition;
+    @Column("control_schema")
+    private String controlSchema;  // HTML
+
+    @Column("data_schema")
+    private JsonNode dataSchema;   // Parsed YAML → JSON
 
     @Column("version_number")
     private Integer versionNumber;
@@ -46,7 +49,8 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
 
     public FormDefinitionEntity(UUID id,
                               String formKey,
-                              JsonNode definition,
+                              String controlSchema,
+                              JsonNode dataSchema,
                               Integer versionNumber,
                               Boolean active,
                               UUID tenantId,
@@ -54,7 +58,8 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
                               String changeMessage) {
         this.id = id;
         this.formKey = formKey;
-        this.definition = definition;
+        this.controlSchema = controlSchema;
+        this.dataSchema = dataSchema;
         this.versionNumber = versionNumber;
         this.active = active;
         this.tenantId = tenantId;
@@ -78,12 +83,20 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
         this.formKey = formKey;
     }
 
-    public JsonNode getDefinition() {
-        return definition;
+    public String getControlSchema() {
+        return controlSchema;
     }
 
-    public void setDefinition(JsonNode definition) {
-        this.definition = definition;
+    public void setControlSchema(String controlSchema) {
+        this.controlSchema = controlSchema;
+    }
+
+    public JsonNode getDataSchema() {
+        return dataSchema;
+    }
+
+    public void setDataSchema(JsonNode dataSchema) {
+        this.dataSchema = dataSchema;
     }
 
     public Integer getVersionNumber() {

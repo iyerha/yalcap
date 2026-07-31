@@ -20,14 +20,15 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
                 title: sourceStep.title,
                 type: sourceStep.type,
                 config: JSON.parse(JSON.stringify(sourceStep.config || {})),
-                next: sourceStep.next,
-                transitions: Object.assign({}, sourceStep.transitions || {}),
-                designer: {
-                    position: {
-                        x: Number(sourceStep.designer && sourceStep.designer.position && sourceStep.designer.position.x) || 0,
-                        y: Number(sourceStep.designer && sourceStep.designer.position && sourceStep.designer.position.y) || 0
-                    }
-                },
+                assignment: JSON.parse(JSON.stringify(sourceStep.assignment || {
+                    kind: 'INTERNAL_USER',
+                    value: '',
+                    mode: 'first-wins',
+                    multiInstance: false
+                })),
+                access: JSON.parse(JSON.stringify(sourceStep.access || { groups: [], users: [] })),
+                ui: JSON.parse(JSON.stringify(sourceStep.ui || { pointer: '', designer: { position: { x: 0, y: 0 } } })),
+                routing: JSON.parse(JSON.stringify(sourceStep.routing || { transitions: {} })),
                 nodeId: sourceStep.nodeId
             } : null;
 
@@ -186,44 +187,23 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             sourceStep.id = draft.id;
             sourceStep.title = draft.title;
             sourceStep.type = draft.type;
-
             sourceStep.config = JSON.parse(JSON.stringify(draft.config || {}));
 
-            if (String(draft.type || '').trim() === 'form') {
-                sourceStep.assignee.kind = String(sourceStep.config.assigneeKind || 'INTERNAL_USER').trim();
-                sourceStep.assignee.value = String(sourceStep.config.assigneeValue || '').trim();
-            } else {
-                sourceStep.assignee.kind = 'INTERNAL_USER';
-                sourceStep.assignee.value = '';
-            }
+            sourceStep.assignment = JSON.parse(JSON.stringify(draft.assignment || {
+                kind: 'INTERNAL_USER',
+                value: '',
+                mode: 'first-wins',
+                multiInstance: false
+            }));
 
-            sourceStep.next = draft.next;
-            sourceStep.transitions = Object.assign({}, draft.transitions || sourceStep.transitions || {});
+            sourceStep.access = JSON.parse(JSON.stringify(draft.access || { groups: [], users: [] }));
 
-            const outputCount = this.getStepTypeOutputCount(draft.type);
-            if (outputCount > 1) {
-                const labels = {};
-                for (let outputIndex = 1; outputIndex <= outputCount; outputIndex += 1) {
-                    const configKey = 'action' + outputIndex + 'Label';
-                    const label = String(sourceStep.config[configKey] || '').trim();
-                    labels['output_' + outputIndex] = label || ('Action ' + outputIndex);
-                }
-                sourceStep.transitionLabels = labels;
+            sourceStep.ui = JSON.parse(JSON.stringify(draft.ui || { pointer: '', designer: { position: { x: 0, y: 0 } } }));
+            sourceStep.routing = JSON.parse(JSON.stringify(draft.routing || { transitions: {} }));
 
-                try {
-                    sourceStep.condition = this.normalizeJsonConfig(sourceStep.config.conditionJson);
-                } catch (_) {
-                    sourceStep.condition = null;
-                }
-            } else {
-                sourceStep.transitionLabels = {};
-                sourceStep.condition = null;
-            }
-
-            sourceStep.designer.position = {
-                x: Number(draft.designer && draft.designer.position && draft.designer.position.x) || 0,
-                y: Number(draft.designer && draft.designer.position && draft.designer.position.y) || 0
-            };
+            const posX = Number(sourceStep.ui && sourceStep.ui.designer && sourceStep.ui.designer.position && sourceStep.ui.designer.position.x) || 0;
+            const posY = Number(sourceStep.ui && sourceStep.ui.designer && sourceStep.ui.designer.position && sourceStep.ui.designer.position.y) || 0;
+            sourceStep.designer = { position: { x: posX, y: posY } };
 
             this.invokeStepHook(sourceStep.type, 'afterSync', {
                 step: sourceStep,

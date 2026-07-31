@@ -1,5 +1,6 @@
 package com.yalcap.definition;
 
+import com.yalcap.definition.form.DefinitionFilesystem;
 import com.yalcap.definition.form.FormDefinitionRepository;
 import com.yalcap.definition.form.control.ControlType;
 import com.yalcap.definition.form.control.ControlTypeClientAssets;
@@ -49,36 +50,41 @@ class DesignerControllerTest {
     void formDesigner_populatesDesignerAssetListsFromControlDescriptors() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
 
+        DefinitionFilesystem definitionFilesystem = Mockito.mock(DefinitionFilesystem.class);
         FormDefinitionRepository formRepository = Mockito.mock(FormDefinitionRepository.class);
+        
+        ControlTypeRegistry controlRegistry = new ControlTypeRegistry(List.of(
+                controlTypeWithAssets("a", ControlTypeClientAssets.designerJsOnly("/js/designer/custom-a.js")),
+                controlTypeWithAssets("b", ControlTypeClientAssets.designerJsOnly("/js/designer/custom-a.js")),
+                controlTypeWithAssets("c", ControlTypeClientAssets.designerCssOnly("/css/designer/custom-a.css"))
+        ));
+        
         FormDefinitionService formService = new FormDefinitionService(
+                definitionFilesystem,
                 formRepository,
-                new ControlTypeRegistry(List.of())
+                controlRegistry,
+                objectMapper
         );
 
         WorkflowDefinitionRepository workflowRepository = Mockito.mock(WorkflowDefinitionRepository.class);
         AssetStorageService assetStorageService = Mockito.mock(AssetStorageService.class);
         ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
+        
         WorkflowDefinitionService workflowService = new WorkflowDefinitionService(
+                definitionFilesystem,
                 workflowRepository,
-                formRepository,
-                assetStorageService,
+                new StepTypeRegistry(List.of(new FormStepType(), new ServiceStepType(), new DecisionStepType())),
+                new WorkflowRuleEngine(objectMapper),
                 new FormLoadDataService(List.of(), objectMapper),
-            new StepTypeRegistry(List.of(new FormStepType(), new ServiceStepType(), new DecisionStepType())),
-            new WorkflowRuleEngine(objectMapper),
+                assetStorageService,
                 objectMapper,
                 eventPublisher
         );
 
-        ControlTypeRegistry registry = new ControlTypeRegistry(List.of(
-                controlTypeWithAssets("a", ControlTypeClientAssets.designerJsOnly("/js/designer/custom-a.js")),
-                controlTypeWithAssets("b", ControlTypeClientAssets.designerJsOnly("/js/designer/custom-a.js")),
-                controlTypeWithAssets("c", ControlTypeClientAssets.designerCssOnly("/css/designer/custom-a.css"))
-        ));
-
         DesignerController controller = new DesignerController(
                 formService,
                 workflowService,
-                registry,
+                controlRegistry,
                 new StepTypeRegistry(List.of(new FormStepType(), new ServiceStepType(), new DecisionStepType())),
                 objectMapper
         );
@@ -101,19 +107,37 @@ class DesignerControllerTest {
         assertEquals(List.of("/css/designer/custom-a.css"), cssAssets);
     }
 
-        @Test
-        void workflowDesigner_mergesControlAndStepDesignerAssets() throws Exception {
+    @Test
+    void workflowDesigner_mergesControlAndStepDesignerAssets() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
 
+        DefinitionFilesystem definitionFilesystem = Mockito.mock(DefinitionFilesystem.class);
         FormDefinitionRepository formRepository = Mockito.mock(FormDefinitionRepository.class);
+        
         FormDefinitionService formService = new FormDefinitionService(
+            definitionFilesystem,
             formRepository,
-            new ControlTypeRegistry(List.of())
+            new ControlTypeRegistry(List.of()),
+            objectMapper
         );
 
-        WorkflowDefinitionService workflowService = Mockito.mock(WorkflowDefinitionService.class);
+        WorkflowDefinitionRepository workflowRepository = Mockito.mock(WorkflowDefinitionRepository.class);
+        AssetStorageService assetStorageService = Mockito.mock(AssetStorageService.class);
+        ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
+        
+        WorkflowDefinitionService workflowService = new WorkflowDefinitionService(
+            definitionFilesystem,
+            workflowRepository,
+            new StepTypeRegistry(List.of(new FormStepType(), new ServiceStepType(), new DecisionStepType())),
+            new WorkflowRuleEngine(objectMapper),
+            new FormLoadDataService(List.of(), objectMapper),
+            assetStorageService,
+            objectMapper,
+            eventPublisher
+        );
+
         WorkflowDefinitionEntity active = new WorkflowDefinitionEntity();
-        Mockito.when(workflowService.getActiveDefinition("sample")).thenReturn(Optional.of(active));
+        Mockito.when(workflowRepository.findActiveByDefinitionKey("sample")).thenReturn(Optional.of(active));
 
         ControlTypeRegistry controlRegistry = new ControlTypeRegistry(List.of(
             controlTypeWithAssets("a", ControlTypeClientAssets.designerJsOnly("/js/designer/custom-a.js"))

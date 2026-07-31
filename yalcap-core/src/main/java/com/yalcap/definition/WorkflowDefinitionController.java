@@ -30,6 +30,7 @@ import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -492,19 +493,22 @@ public class WorkflowDefinitionController {
             return ResponseEntity.ok(published);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        } catch (IOException ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to write definition: " + ex.getMessage()));
         }
     }
 
     public static class PublishDefinitionRequest {
-        private JsonNode definition;
+        private String definition;
         private String createdBy;
         private String changeMessage;
 
-        public JsonNode getDefinition() {
+        public String getDefinition() {
             return definition;
         }
 
-        public void setDefinition(JsonNode definition) {
+        public void setDefinition(String definition) {
             this.definition = definition;
         }
 

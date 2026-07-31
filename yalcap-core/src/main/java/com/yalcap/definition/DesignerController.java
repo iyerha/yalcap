@@ -8,13 +8,14 @@ import com.yalcap.definition.workflow.WorkflowDefinitionEntity;
 import com.yalcap.definition.workflow.step.StepTypeClientAssets;
 import com.yalcap.definition.workflow.step.StepTypeDescriptor;
 import com.yalcap.definition.workflow.step.StepTypeRegistry;
+import com.yalcap.tenant.TenantContext;
+
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -30,7 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Controller
-@RequestMapping({"/designer", "/t/{tenantId}/designer"})
+@RequestMapping("/designer")
 public class DesignerController {
 
     private final FormDefinitionService formDefinitionService;
@@ -52,29 +53,30 @@ public class DesignerController {
     }
 
     @GetMapping
-    public String designerPage(@PathVariable(value = "tenantId", required = false) UUID tenantId, Model model) throws Exception {
+    public String designerPage(Model model) throws Exception {
         String definitionKey = "example-review";
         putDefinitionKey(model, definitionKey);
+        UUID tenantId = TenantContext.requireTenantId();
         model.addAttribute("tenantId", tenantId);
         seedExampleDefinition(definitionKey);
         return "designer";
     }
 
     @GetMapping("/active")
-    public String activeDefinition(@PathVariable(value = "tenantId", required = false) UUID tenantId,
-                                 @RequestParam String definitionKey,
+    public String activeDefinition(@RequestParam String definitionKey,
                                  Model model) {
         putDefinitionKey(model, definitionKey);
+        UUID tenantId = TenantContext.requireTenantId();
         model.addAttribute("tenantId", tenantId);
         definitionService.getActiveDefinition(definitionKey).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
         return "designer/active :: content";
     }
 
     @GetMapping("/history")
-    public String definitionHistory(@PathVariable(value = "tenantId", required = false) UUID tenantId,
-                                  @RequestParam String definitionKey,
+    public String definitionHistory(@RequestParam String definitionKey,
                                   Model model) {
         putDefinitionKey(model, definitionKey);
+        UUID tenantId = TenantContext.requireTenantId();
         model.addAttribute("tenantId", tenantId);
         List<WorkflowDefinitionEntity> history = definitionService.getDefinitionHistory(definitionKey);
         model.addAttribute("history", history);
@@ -82,18 +84,30 @@ public class DesignerController {
     }
 
     @PostMapping("/publish")
-    public String publishDefinition(@PathVariable(value = "tenantId", required = false) UUID tenantId,
-                                  @ModelAttribute PublishDefinitionForm form,
-                                  Model model) throws Exception {
+    public String publishDefinition(@ModelAttribute PublishDefinitionForm form,
+                                Model model) throws Exception {
+        UUID tenantId = TenantContext.requireTenantId();
         JsonNode definition = objectMapper.readTree(form.getDefinition());
         putDefinitionKey(model, form.getDefinitionKey());
         model.addAttribute("tenantId", tenantId);
         try {
             String kind = definition.path("kind").asString("").trim();
             if ("form".equals(kind)) {
+                // Extract controlSchema (HTML) and dataSchema (YAML)
+                String htmlControlSchema = definition.path("controlSchema").asString();
+                String yamlDataSchema = definition.path("dataSchema").asString();
+                
+                if (htmlControlSchema.isEmpty()) {
+                    throw new IllegalArgumentException("Form definition must include controlSchema");
+                }
+                if (yamlDataSchema.isEmpty()) {
+                    throw new IllegalArgumentException("Form definition must include dataSchema");
+                }
+                
                 FormDefinitionEntity publishedForm = formDefinitionService.publish(
                         form.getDefinitionKey(),
-                        definition,
+                        htmlControlSchema,
+                        yamlDataSchema,
                         form.getCreatedBy(),
                         form.getChangeMessage()
                 );
@@ -101,7 +115,7 @@ public class DesignerController {
             } else {
                 WorkflowDefinitionEntity published = definitionService.publishDefinition(
                         form.getDefinitionKey(),
-                        definition,
+                        form.getDefinition(),
                         form.getCreatedBy(),
                         form.getChangeMessage()
                 );
@@ -111,7 +125,7 @@ public class DesignerController {
         } catch (IllegalArgumentException ex) {
             String kind = definition.path("kind").asString("").trim();
             if ("form".equals(kind)) {
-                formDefinitionService.getActiveForm(form.getDefinitionKey()).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
+                formDefinitionService.getActiveDefinition(form.getDefinitionKey()).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
             } else {
                 definitionService.getActiveDefinition(form.getDefinitionKey()).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
             }
@@ -121,23 +135,23 @@ public class DesignerController {
     }
 
     @GetMapping("/form")
-    public String formDesigner(@PathVariable(value = "tenantId", required = false) UUID tenantId,
-                               @RequestParam(required = false) String definitionKey,
+    public String formDesigner(@RequestParam(required = false) String definitionKey,
                                Model model) throws Exception {
         String key = definitionKey != null ? definitionKey : "example-review";
         putDefinitionKey(model, key);
+        UUID tenantId = TenantContext.requireTenantId();
         model.addAttribute("tenantId", tenantId);
         addDesignerAssets(model, false);
-        formDefinitionService.getActiveForm(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
+        formDefinitionService.getActiveDefinition(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
         return "designer/form";
     }
 
     @GetMapping("/workflow")
-    public String workflowDesigner(@PathVariable(value = "tenantId", required = false) UUID tenantId,
-                                   @RequestParam(required = false) String definitionKey,
+    public String workflowDesigner(@RequestParam(required = false) String definitionKey,
                                    Model model) throws Exception {
         String key = definitionKey != null ? definitionKey : "example-review";
         putDefinitionKey(model, key);
+        UUID tenantId = TenantContext.requireTenantId();
         model.addAttribute("tenantId", tenantId);
         addDesignerAssets(model, true);
         model.addAttribute("workflowStepTypes", stepTypeRegistry.descriptors());
@@ -150,15 +164,13 @@ public class DesignerController {
     }
 
     @PostMapping("/workflow/publish")
-    public String publishWorkflowDefinition(@PathVariable(value = "tenantId", required = false) UUID tenantId,
-                                            @ModelAttribute PublishDefinitionForm form,
+    public String publishWorkflowDefinition(@ModelAttribute PublishDefinitionForm form,
                                             RedirectAttributes redirectAttributes) throws Exception {
-        JsonNode definition = objectMapper.readTree(form.getDefinition());
 
         try {
             definitionService.publishDefinition(
                     form.getDefinitionKey(),
-                    definition,
+                    form.getDefinition(),
                     form.getCreatedBy(),
                     form.getChangeMessage()
             );
@@ -167,6 +179,7 @@ public class DesignerController {
             redirectAttributes.addFlashAttribute("publishError", ex.getMessage());
         }
 
+        UUID tenantId = TenantContext.requireTenantId();
         String basePath = tenantId != null ? "/t/" + tenantId + "/designer/workflow" : "/designer/workflow";
         return "redirect:" + basePath + "?definitionKey=" + form.getDefinitionKey();
     }
@@ -176,8 +189,7 @@ public class DesignerController {
             ClassPathResource resource = new ClassPathResource("manifests/example-review-manifest.json");
             try (Scanner scanner = new Scanner(resource.getInputStream(), StandardCharsets.UTF_8.name())) {
                 String content = scanner.useDelimiter("\\A").hasNext() ? scanner.next() : "";
-                JsonNode definition = objectMapper.readTree(content);
-                definitionService.publishDefinition(definitionKey, definition, "system", "Seed example definition");
+                definitionService.publishDefinition(definitionKey, content, "system", "Seed example definition");
             }
         }
     }

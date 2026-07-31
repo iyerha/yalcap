@@ -1,5 +1,7 @@
 package com.yalcap.definition.form;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import com.yalcap.definition.FormDefinitionService;
 import com.yalcap.definition.form.control.ControlTypeRegistry;
 import com.yalcap.definition.form.control.internal.AutocompleteControlType;
@@ -10,233 +12,146 @@ import com.yalcap.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class FormDefinitionServiceTest {
   private static final UUID TENANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final FormDefinitionRepository repository = Mockito.mock(FormDefinitionRepository.class);
+  private final DefinitionFilesystem definitionFilesystem = Mockito.mock(DefinitionFilesystem.class);
   private final ControlTypeRegistry controlTypeRegistry = new ControlTypeRegistry(List.of(
       new DateControlType(objectMapper),
       new DateTimeControlType(objectMapper),
-      new AutocompleteControlType(objectMapper)
-  ));
-  private final FormDefinitionService service = new FormDefinitionService(repository, controlTypeRegistry);
-    @BeforeEach
-    void setUp() {
-        TenantContext.setTenantId(TENANT_ID);
-    }
+      new AutocompleteControlType(objectMapper)));
 
-    @AfterEach
-    void tearDown() {
-        TenantContext.clear();
-    }
+  private FormDefinitionService service;
+  private MockedStatic<TenantContext> mockedTenantContext;
 
-    @Test
-    void publish_acceptsDateDateTimeAndAutocompleteControls() throws Exception {
-        when(repository.findActiveByFormKey("sample-form")).thenReturn(Optional.empty());
-        when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+  @BeforeEach
+  void setUp() {
+    mockedTenantContext = mockStatic(TenantContext.class);
+    mockedTenantContext.when(TenantContext::getTenantId)
+        .thenReturn(Optional.of(TENANT_ID));
 
-        JsonNode definition = objectMapper.readTree("""
-                {
-                  "kind": "form",
-                  "form": {
-                    "dataSchema": {
-                      "type": "object",
-                      "properties": {
-                        "startDate": {"type": "string", "format": "date"},
-                        "startAt": {"type": "string", "format": "date-time"},
-                        "city": {"type": "string", "enum": ["nyc", "ldn"]}
-                      }
-                    },
-                    "controlSchema": {
-                      "layout": [
-                        {"pointer": "#/properties/startDate", "stateKey": "startDate", "widget": "date", "label": "Start date", "minDate": "2026-01-01", "maxDate": "2026-12-31"},
-                        {"pointer": "#/properties/startAt", "stateKey": "startAt", "widget": "datetime", "label": "Start at", "minDateTime": "2026-01-01T09:00", "maxDateTime": "2026-12-31T17:00"},
-                        {"pointer": "#/properties/city", "stateKey": "city", "widget": "autocomplete", "label": "City", "options": [{"label": "New York", "value": "nyc"}, {"label": "London", "value": "ldn"}]}
-                      ]
-                    }
-                  }
-                }
-                """);
+    service = new FormDefinitionService(
+        definitionFilesystem,
+        repository,
+        controlTypeRegistry,
+        objectMapper);
+  }
 
-        FormDefinitionEntity published = service.publish("sample-form", definition, "tester", "add widgets");
+  @AfterEach
+  void tearDown() {
+    mockedTenantContext.close();
+  }
 
-        assertEquals("sample-form", published.getFormKey());
-        assertEquals("date", published.getDefinition().path("form").path("controlSchema").path("layout").get(0).path("widget").asString());
-        assertFalse(published.getDefinition().path("form").path("controlSchema").path("layout").get(0).path("id").asString("").isBlank());
-    }
+  @Test
+  void publish_acceptsValidHtml() throws IOException {
+    when(repository.findActiveByFormKey("sample-form")).thenReturn(Optional.empty());
+    when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    @Test
-    void publish_acceptsRemoteAutocompleteWithoutStaticOptions() throws Exception {
-        when(repository.findActiveByFormKey("sample-form")).thenReturn(Optional.empty());
-        when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    String htmlControlSchema = "<form th:fragment=\"form\"><input type='text' name='name' /></form>";
+    String yamlDataSchema = """
+        properties:
+          name:
+            type: string
+        """;
 
-        JsonNode definition = objectMapper.readTree("""
-                {
-                  "kind": "form",
-                  "form": {
-                    "dataSchema": {
-                      "type": "object",
-                      "properties": {
-                        "city": {"type": "string"}
-                      }
-                    },
-                    "controlSchema": {
-                      "layout": [
-                        {"pointer": "#/properties/city", "stateKey": "city", "widget": "autocomplete", "label": "City", "autocompleteSourceType": "remote", "autocompleteSourceUrl": "/api/lookups/cities", "autocompleteLabelField": "label", "autocompleteValueField": "value", "autocompleteSearchParam": "q", "options": []}
-                      ]
-                    }
-                  }
-                }
-                """);
+    FormDefinitionEntity published = service.publish("sample-form", htmlControlSchema, yamlDataSchema, "tester",
+        "add form");
 
-        FormDefinitionEntity published = service.publish("sample-form", definition, "tester", "remote autocomplete");
+    assertEquals("sample-form", published.getFormKey());
+    assertEquals(htmlControlSchema, published.getControlSchema());
+    assertEquals(1, published.getVersionNumber());
+    assertTrue(published.getActive());
+  }
 
-        assertEquals("sample-form", published.getFormKey());
-    }
+  @Test
+  void publish_rejectsInvalidHtml() throws IOException {
+    String malformedHtml = "<form><input type='text' name='name'>";
+    String yamlDataSchema = """
+        properties:
+          name:
+            type: string
+        """;
 
-    @Test
-    void publish_rejectsDateBoundsWhereMaxBeforeMin() throws Exception {
-        JsonNode definition = objectMapper.readTree("""
-                {
-                  "kind": "form",
-                  "form": {
-                    "dataSchema": {"type": "object", "properties": {"startDate": {"type": "string", "format": "date"}}},
-                    "controlSchema": {
-                      "layout": [
-                        {"pointer": "#/properties/startDate", "stateKey": "startDate", "widget": "date", "label": "Start date", "minDate": "2026-12-31", "maxDate": "2026-01-01"}
-                      ]
-                    }
-                  }
-                }
-                """);
+    assertThrows(IllegalArgumentException.class,
+        () -> service.publish("sample-form", malformedHtml, yamlDataSchema, "tester", "bad html"));
+  }
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.publish("sample-form", definition, "tester", "invalid dates"));
+  @Test
+  void publish_rejectsMissingThymeleafFragment() throws IOException {
+    String htmlWithoutFragment = "<form><input type='text' name='name' /></form>";
+    String yamlDataSchema = """
+        properties:
+          name:
+            type: string
+        """;
 
-        assertEquals("form.controlSchema.layout[0].maxDate must be greater than or equal to minDate", ex.getMessage());
-    }
+    assertThrows(IllegalArgumentException.class,
+        () -> service.publish("sample-form", htmlWithoutFragment, yamlDataSchema, "tester", "missing fragment"));
+  }
 
-    @Test
-    void publish_rejectsAutocompleteWithoutOptions() throws Exception {
-        JsonNode definition = objectMapper.readTree("""
-                {
-                  "kind": "form",
-                  "form": {
-                    "dataSchema": {"type": "object", "properties": {"city": {"type": "string"}}},
-                    "controlSchema": {
-                      "layout": [
-                        {"pointer": "#/properties/city", "stateKey": "city", "widget": "autocomplete", "label": "City", "options": []}
-                      ]
-                    }
-                  }
-                }
-                """);
+  @Test
+  void publishValidateBindingBetweenHtmlAndSchema() throws IOException {
+    when(repository.findActiveByFormKey("contact-form")).thenReturn(Optional.empty());
+    when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    String htmlControlSchema = """
+        <form th:fragment="form">
+            <input type="text" name="email" />
+            <input type="text" name="status" />
+        </form>
+        """;
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.publish("sample-form", definition, "tester", "invalid autocomplete"));
+    String yamlDataSchema = """
+        properties:
+          email:
+            type: string
+          status:
+            type: string
+          other:
+            type: string
+        """;
 
-        assertEquals("form.controlSchema.layout[0].options is required for autocomplete widget", ex.getMessage());
-    }
+    FormDefinitionEntity result = service.publish("contact-form", htmlControlSchema, yamlDataSchema, "alice",
+        "Initial");
 
-    @Test
-    void publish_rejectsRemoteAutocompleteWithoutSourceUrl() throws Exception {
-        JsonNode definition = objectMapper.readTree("""
-                {
-                  "kind": "form",
-                  "form": {
-                    "dataSchema": {"type": "object", "properties": {"city": {"type": "string"}}},
-                    "controlSchema": {
-                      "layout": [
-                        {"pointer": "#/properties/city", "stateKey": "city", "widget": "autocomplete", "label": "City", "autocompleteSourceType": "remote", "options": []}
-                      ]
-                    }
-                  }
-                }
-                """);
+    assertEquals("contact-form", result.getFormKey());
+    assertEquals(1, result.getVersionNumber());
+    assertTrue(result.getActive());
+  }
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.publish("sample-form", definition, "tester", "invalid remote autocomplete"));
+  @Test
+  void publishFailsWhenHtmlFieldNotInSchema() {
+    String htmlControlSchema = """
+        <form th:fragment="form">
+            <input type="text" name="email" />
+            <input type="text" name="phone" />
+        </form>
+        """;
 
-        assertEquals("form.controlSchema.layout[0].autocompleteSourceUrl is required for remote autocomplete widget", ex.getMessage());
-    }
+    String yamlDataSchema = """
+        properties:
+          email:
+            type: string
+        """;
 
-    @Test
-    void publish_assignsMissingControlIdsAndKeepsExistingId() throws Exception {
-        when(repository.findActiveByFormKey("sample-form")).thenReturn(Optional.empty());
-        when(repository.save(any(FormDefinitionEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        String existingGuid = "11111111-1111-4111-8111-111111111111";
-        JsonNode definition = objectMapper.readTree("""
-                {
-                  "kind": "form",
-                  "form": {
-                    "dataSchema": {
-                      "type": "object",
-                      "properties": {
-                        "a": {"type": "string"},
-                        "b": {"type": "string"}
-                      }
-                    },
-                    "controlSchema": {
-                      "layout": [
-                        {"pointer": "#/properties/a", "stateKey": "a", "widget": "text", "label": "A", "id": "11111111-1111-4111-8111-111111111111"},
-                        {"pointer": "#/properties/b", "stateKey": "b", "widget": "text", "label": "B"}
-                      ]
-                    }
-                  }
-                }
-                """);
-
-        FormDefinitionEntity published = service.publish("sample-form", definition, "tester", "guid coverage");
-        JsonNode layout = published.getDefinition().path("form").path("controlSchema").path("layout");
-
-        assertEquals(existingGuid, layout.get(0).path("id").asString());
-        assertTrue(layout.get(1).has("id"));
-        assertFalse(layout.get(1).path("id").asString("").isBlank());
-        assertFalse(layout.get(0).path("id").asString().equalsIgnoreCase(layout.get(1).path("id").asString()));
-    }
-
-    @Test
-    void publish_rejectsDuplicateControlId() throws Exception {
-        JsonNode definition = objectMapper.readTree("""
-                {
-                  "kind": "form",
-                  "form": {
-                    "dataSchema": {
-                      "type": "object",
-                      "properties": {
-                        "a": {"type": "string"},
-                        "b": {"type": "string"}
-                      }
-                    },
-                    "controlSchema": {
-                      "layout": [
-                        {"pointer": "#/properties/a", "stateKey": "a", "widget": "text", "label": "A", "id": "11111111-1111-4111-8111-111111111111"},
-                        {"pointer": "#/properties/b", "stateKey": "b", "widget": "text", "label": "B", "id": "11111111-1111-4111-8111-111111111111"}
-                      ]
-                    }
-                  }
-                }
-                """);
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.publish("sample-form", definition, "tester", "dup guid"));
-
-        assertEquals("form.controlSchema.layout[1].id must be unique", ex.getMessage());
-    }
+    assertThrows(IllegalArgumentException.class,
+        () -> service.publish("contact-form", htmlControlSchema, yamlDataSchema, "alice", "Initial"));
+  }
 }

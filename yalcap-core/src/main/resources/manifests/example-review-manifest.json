@@ -10,37 +10,78 @@
       "amount": { "type": "number" },
       "notes": { "type": "string" }
     },
-    "required": ["applicantName","amount"]
+    "required": ["applicantName", "amount"]
   },
   "controlSchema": {
-    "layout": [{ "pointer": "#/properties/applicantName", "widget": "text" }, { "pointer": "#/properties/amount", "widget": "number" }, { "pointer": "#/properties/notes", "widget": "textarea" }]
+    "layout": [
+      { "pointer": "#/properties/applicantName", "widget": "text" },
+      { "pointer": "#/properties/amount", "widget": "number" },
+      { "pointer": "#/properties/notes", "widget": "textarea" }
+    ]
   },
   "steps": [
     {
       "id": "submit",
       "title": "Submit",
-      "uiPointer": "#/control/submit",
-      "allowedGroups": ["requestor"],
-      "assignmentMode": "first-wins",
-      "multiInstance": false,
-      "transitions": { "onSubmit": "review" }
+      "type": "form",
+      "assignment": {
+        "kind": "INTERNAL_GROUP",
+        "value": "requestor",
+        "mode": "first-wins",
+        "multiInstance": false
+      },
+      "access": {
+        "groups": ["requestor"],
+        "users": []
+      },
+      "ui": {
+        "pointer": "#/control/submit"
+      },
+      "routing": {
+        "transitions": { "onSubmit": "review" }
+      }
     },
     {
       "id": "review",
       "title": "Review",
-      "uiPointer": "#/control/review",
-      "allowedGroups": ["finance","audit"],
-      "allowedUsers": ["alice","bob"],
-      "assignmentMode": "parallel",
-      "multiInstance": true,
-      "transitions": { "onApprove": "approved", "onReject": "submit" }
+      "type": "form",
+      "assignment": {
+        "kind": "INTERNAL_GROUP",
+        "value": "finance",
+        "mode": "parallel",
+        "multiInstance": true
+      },
+      "access": {
+        "groups": ["finance", "audit"],
+        "users": ["alice", "bob"]
+      },
+      "ui": {
+        "pointer": "#/control/review"
+      },
+      "routing": {
+        "transitions": { "onApprove": "approved", "onReject": "submit" }
+      }
     },
     {
       "id": "approved",
       "title": "Approved",
-      "uiPointer": "#/control/approved",
-      "allowedGroups": ["system"],
-      "multiInstance": false
+      "type": "form",
+      "assignment": {
+        "kind": "INTERNAL_GROUP",
+        "value": "system",
+        "mode": "first-wins",
+        "multiInstance": false
+      },
+      "access": {
+        "groups": ["system"],
+        "users": []
+      },
+      "ui": {
+        "pointer": "#/control/approved"
+      },
+      "routing": {
+        "transitions": {}
+      }
     }
   ]
 }

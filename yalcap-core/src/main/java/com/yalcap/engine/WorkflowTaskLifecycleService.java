@@ -145,7 +145,7 @@ public class WorkflowTaskLifecycleService {
         instance.setData(finalData);
         workflowInstanceRepository.save(instance);
 
-        List<AssignmentEntity> activeAssignments = assignmentRepository.findByInstanceIdAndActiveTrue(command.instanceId());
+        List<AssignmentEntity> activeAssignments = assignmentRepository.findActiveByInstanceId(command.instanceId());
         OffsetDateTime now = OffsetDateTime.now();
         int completedCount = 0;
         for (AssignmentEntity assignment : activeAssignments) {

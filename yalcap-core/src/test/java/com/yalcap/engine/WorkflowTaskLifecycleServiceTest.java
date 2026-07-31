@@ -161,7 +161,7 @@ class WorkflowTaskLifecycleServiceTest {
 
         when(workflowInstanceRepository.findById(instanceId)).thenReturn(Optional.of(instance));
         when(workflowInstanceRepository.save(any(WorkflowInstanceEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(assignmentRepository.findByInstanceIdAndActiveTrue(instanceId)).thenReturn(List.of(reviewAssignment, otherStepAssignment));
+        when(assignmentRepository.findActiveByInstanceId(instanceId)).thenReturn(List.of(reviewAssignment, otherStepAssignment));
         when(assignmentRepository.save(any(AssignmentEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(eventRepository.save(any(EventEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 

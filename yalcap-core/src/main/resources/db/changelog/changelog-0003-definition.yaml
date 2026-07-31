@@ -76,7 +76,12 @@ databaseChangeLog:
                   type: boolean
                   defaultValueBoolean: true
               - column:
-                  name: definition
+                  name: control_schema
+                  type: clob
+                  constraints:
+                    nullable: false
+              - column:
+                  name: data_schema
                   type: ${json.type}
                   constraints:
                     nullable: false
