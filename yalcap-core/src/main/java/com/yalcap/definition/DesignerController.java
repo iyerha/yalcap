@@ -160,7 +160,7 @@ public class DesignerController {
             : "/designer/workflow/publish");
         seedExampleDefinition(key);
         definitionService.getActiveDefinition(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
-        return "designer/workflow";
+        return "designer/workflow/workflow";
     }
 
     @PostMapping("/workflow/publish")

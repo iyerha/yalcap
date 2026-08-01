@@ -1,12 +1,12 @@
-window.yalcapWorkflowStepHooks = window.yalcapWorkflowStepHooks || {};
-window.yalcapRegisterWorkflowStepHook = function yalcapRegisterWorkflowStepHook(type, hook) {
+window.workflowStepHooks = window.workflowStepHooks || {};
+window.registerWorkflowStepHook = function registerWorkflowStepHook(type, hook) {
     const key = String(type || '').trim().toLowerCase();
     if (!key || !hook || typeof hook !== 'object') {
         return;
     }
 
-    const existing = window.yalcapWorkflowStepHooks[key] || {};
-    window.yalcapWorkflowStepHooks[key] = Object.assign({}, existing, hook);
+    const existing = window.workflowStepHooks[key] || {};
+    window.workflowStepHooks[key] = Object.assign({}, existing, hook);
 };
 
 function workflowDesigner() {
@@ -40,7 +40,7 @@ function workflowDesigner() {
                 return null;
             }
 
-            const hooks = window.yalcapWorkflowStepHooks || {};
+            const hooks = window.workflowStepHooks || {};
             const hook = hooks[key];
             return hook && typeof hook === 'object' ? hook : null;
         },
@@ -291,6 +291,9 @@ function workflowDesigner() {
     }
     if (window.workflowDesignerCanvasMixin) {
         window.workflowDesignerCanvasMixin(designer);
+    }
+    if (window.workflowDesignerIndexConfigMixin) {
+        window.workflowDesignerIndexConfigMixin(designer);
     }
 
     return designer;

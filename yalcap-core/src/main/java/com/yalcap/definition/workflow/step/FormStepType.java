@@ -22,8 +22,9 @@ public class FormStepType implements StepType {
             createConfigSchema(),
             createDefaultConfig(),
             StepTypeClientAssets.designerAssets(
-                    new String[] { "/js/designer/workflow/steps/designer-step-form.js" },
-                    new String[] { "/css/designer/workflow/steps/designer-step-form.css" }));
+                    new String[] { "/js/designer/workflow/steps/form/designer-step-form.js" },
+                    new String[] { "/css/designer/workflow/steps/form/designer-step-form.css" },
+                    "/designer/workflow/steps/form/step-form.html"));
 
     @Override
     public String type() {

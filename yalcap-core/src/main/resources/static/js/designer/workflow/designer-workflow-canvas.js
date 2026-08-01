@@ -633,32 +633,28 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 kind: 'workflow',
                 id: this.definitionKey,
                 steps: this.steps.map((step) => {
-                    const posX = Number(step.ui && step.ui.designer && step.ui.designer.position && step.ui.designer.position.x)
-                        || 0;
-                    const posY = Number(step.ui && step.ui.designer && step.ui.designer.position && step.ui.designer.position.y)
-                        || 0;
-
-                    return {
+                    const cleanedStep = {
                         id: String(step.id || '').trim(),
                         title: String(step.title || '').trim(),
                         type: String(step.type || '').trim(),
-                        assignment: JSON.parse(JSON.stringify(step.assignment || {
-                            kind: 'INTERNAL_USER',
-                            value: '',
-                            mode: 'first-wins',
-                            multiInstance: false
-                        })),
-                        access: JSON.parse(JSON.stringify(step.access || { groups: [], users: [] })),
-                        ui: {
-                            pointer: String(step.ui && step.ui.pointer || '').trim(),
-                            designer: {
-                                position: { x: posX, y: posY }
-                            }
-                        },
-                        routing: {
-                            transitions: Object.assign({}, (step.routing && step.routing.transitions) || {})
-                        }
+                        routing: step.routing || { transitions: {} }
                     };
+
+                    // Copy all other properties generically
+                    Object.keys(step).forEach((key) => {
+                        if (['id', 'title', 'type', 'routing', 'nodeId', 'designer'].includes(key)) {
+                            return;
+                        }
+                        cleanedStep[key] = typeof step[key] === 'object' && step[key] !== null
+                            ? JSON.parse(JSON.stringify(step[key]))
+                            : step[key];
+                    });
+
+                    if (step.ui && typeof step.ui === 'object') {
+                        cleanedStep.ui = JSON.parse(JSON.stringify(step.ui));
+                    }
+
+                    return cleanedStep;
                 })
             };
 

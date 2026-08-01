@@ -1,0 +1,41 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+    <template x-for="field in getAllCustomFields()" :key="field.section + '.' + field.key">
+        <div>
+            <label x-text="field.title"></label>
+            
+            <!-- Select dropdown -->
+            <template x-if="field.type === 'select'">
+                <select :value="getFieldValue(field.section, field.key)" @change="updateFieldValue(field.section, field.key, $event.target.value)">
+                    <option value=""></option>
+                    <template x-for="option in field.enumValues" :key="typeof option === 'string' ? option : option.value">
+                        <option :value="typeof option === 'string' ? option : option.value" x-text="typeof option === 'string' ? option : option.label"></option>
+                    </template>
+                </select>
+            </template>
+            
+            <!-- Autocomplete (form reference) -->
+            <template x-if="field.key === 'pointer'">
+                <div class="autocomplete-wrapper">
+                    <input 
+                        type="text" 
+                        :value="getFieldValue(field.section, field.key)"
+                        @input="searchForms($event.target.value)"
+                        :placeholder="field.placeholder || ''"
+                    />
+                    <div class="autocomplete-dropdown" x-show="formSearchOpen" x-cloak>
+                        <template x-for="result in formSearchResults" :key="result.key">
+                            <div class="autocomplete-item" @click="selectFormReference(result.key)">
+                                <span x-text="result.title"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- Text input (default) -->
+            <template x-if="field.type === 'text' || (!field.type && field.key !== 'pointer')">
+                <input type="text" :value="getFieldValue(field.section, field.key)" @input="updateFieldValue(field.section, field.key, $event.target.value)" :placeholder="field.placeholder || ''" />
+            </template>
+        </div>
+    </template>
+</th:block>

@@ -1,5 +1,5 @@
 (function registerDecisionStepHook() {
-    var register = window.yalcapRegisterWorkflowStepHook;
+    var register = window.registerWorkflowStepHook;
     if (typeof register !== 'function') {
         return;
     }

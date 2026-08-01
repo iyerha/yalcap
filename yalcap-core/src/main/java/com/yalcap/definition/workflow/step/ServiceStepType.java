@@ -18,8 +18,8 @@ public class ServiceStepType implements StepType {
             createConfigSchema(),
             createDefaultConfig(),
             StepTypeClientAssets.designerAssets(
-                new String[]{"/js/designer/workflow/steps/designer-step-service.js"},
-                new String[]{"/css/designer/workflow/steps/designer-step-service.css"}
+                new String[]{"/js/designer/workflow/steps/service/designer-step-service.js"},
+                new String[]{"/css/designer/workflow/steps/service/designer-step-service.css"}
             )
     );
 

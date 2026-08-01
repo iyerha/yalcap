@@ -20,8 +20,8 @@ public class DecisionStepType implements StepType {
         createConfigSchema(),
             createDefaultConfig(),
             StepTypeClientAssets.designerAssets(
-                new String[]{"/js/designer/workflow/steps/designer-step-decision.js"},
-                new String[]{"/css/designer/workflow/steps/designer-step-decision.css"}
+                new String[]{"/js/designer/workflow/steps/decision/designer-step-decision.js"},
+                new String[]{"/css/designer/workflow/steps/decision/designer-step-decision.css"}
             )
     );
 

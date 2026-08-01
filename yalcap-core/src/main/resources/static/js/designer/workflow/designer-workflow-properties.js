@@ -20,14 +20,9 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
                 title: sourceStep.title,
                 type: sourceStep.type,
                 config: JSON.parse(JSON.stringify(sourceStep.config || {})),
-                assignment: JSON.parse(JSON.stringify(sourceStep.assignment || {
-                    kind: 'INTERNAL_USER',
-                    value: '',
-                    mode: 'first-wins',
-                    multiInstance: false
+                ui: JSON.parse(JSON.stringify({
+                    designer: { position: { x: 0, y: 0 } }
                 })),
-                access: JSON.parse(JSON.stringify(sourceStep.access || { groups: [], users: [] })),
-                ui: JSON.parse(JSON.stringify(sourceStep.ui || { pointer: '', designer: { position: { x: 0, y: 0 } } })),
                 routing: JSON.parse(JSON.stringify(sourceStep.routing || { transitions: {} })),
                 nodeId: sourceStep.nodeId
             } : null;
@@ -41,6 +36,10 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
                     },
                     sync: () => this.syncSelectedStep()
                 });
+            }
+            // Refresh index config if this is a form step
+            if (typeof this.refreshIndexConfig === 'function') {
+                this.refreshIndexConfig();
             }
         },
 
@@ -161,6 +160,57 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             this.syncSelectedStep();
         },
 
+        getStepHook(type) {
+            if (!type) return null;
+            const key = String(type || '').trim().toLowerCase();
+            const hooks = window.workflowStepHooks || {};
+            return hooks[key] || null;
+        },
+
+        getStepTypeFieldValue(fieldName) {
+            if (!this.selectedStepDraft) {
+                return '';
+            }
+            const value = this.selectedStepDraft[fieldName];
+            return value == null ? '' : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+        },
+
+        updateStepTypeField(fieldName, value) {
+            if (!this.selectedStepDraft) {
+                return;
+            }
+            this.selectedStepDraft[fieldName] = String(value || '').trim();
+            this.syncSelectedStep();
+        },
+
+        getAllCustomFields() {
+            if (!this.selectedStepDraft) return [];
+            const hook = this.getStepHook(this.selectedStepDraft.type);
+            return (hook && Array.isArray(hook.customFields)) ? hook.customFields : [];
+        },
+
+        getFieldValue(section, fieldKey) {
+            if (!this.selectedStepDraft || !this.selectedStepDraft[section]) return '';
+            const value = this.selectedStepDraft[section][fieldKey];
+            return value == null ? '' : String(value);
+        },
+
+        updateFieldValue(section, fieldKey, value) {
+            if (!this.selectedStepDraft) return;
+            if (!this.selectedStepDraft[section]) {
+                this.selectedStepDraft[section] = {};
+            }
+            this.selectedStepDraft[section][fieldKey] = String(value || '').trim();
+            this.syncSelectedStep();
+
+            if (section === 'ui' && fieldKey === 'pointer') {
+                // Form reference changed, reload index config
+                if (typeof this.refreshIndexConfig === 'function') {
+                    this.refreshIndexConfig();
+                }
+            }
+        },
+
         syncSelectedStep() {
             const draft = this.selectedStepDraft;
             if (!draft) {
@@ -184,26 +234,26 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
                 return;
             }
 
-            sourceStep.id = draft.id;
-            sourceStep.title = draft.title;
-            sourceStep.type = draft.type;
-            sourceStep.config = JSON.parse(JSON.stringify(draft.config || {}));
+            // Copy all properties from draft to sourceStep (hook-safe)
+            const internalProps = new Set(['nodeId']);
+            Object.keys(draft).forEach((key) => {
+                if (!internalProps.has(key)) {
+                    sourceStep[key] = typeof draft[key] === 'object' && draft[key] !== null
+                        ? JSON.parse(JSON.stringify(draft[key]))
+                        : draft[key];
+                }
+            });
 
-            sourceStep.assignment = JSON.parse(JSON.stringify(draft.assignment || {
-                kind: 'INTERNAL_USER',
-                value: '',
-                mode: 'first-wins',
-                multiInstance: false
-            }));
-
-            sourceStep.access = JSON.parse(JSON.stringify(draft.access || { groups: [], users: [] }));
-
-            sourceStep.ui = JSON.parse(JSON.stringify(draft.ui || { pointer: '', designer: { position: { x: 0, y: 0 } } }));
-            sourceStep.routing = JSON.parse(JSON.stringify(draft.routing || { transitions: {} }));
-
+            // Ensure designer position is preserved
             const posX = Number(sourceStep.ui && sourceStep.ui.designer && sourceStep.ui.designer.position && sourceStep.ui.designer.position.x) || 0;
             const posY = Number(sourceStep.ui && sourceStep.ui.designer && sourceStep.ui.designer.position && sourceStep.ui.designer.position.y) || 0;
-            sourceStep.designer = { position: { x: posX, y: posY } };
+            if (!sourceStep.ui) {
+                sourceStep.ui = {};
+            }
+            if (!sourceStep.ui.designer) {
+                sourceStep.ui.designer = {};
+            }
+            sourceStep.ui.designer.position = { x: posX, y: posY };
 
             this.invokeStepHook(sourceStep.type, 'afterSync', {
                 step: sourceStep,
