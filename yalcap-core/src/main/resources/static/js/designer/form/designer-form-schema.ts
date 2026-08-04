@@ -1,17 +1,84 @@
-// @ts-check
-(function () {
-    const windowAny = /** @type {any} */ (window);
-    const schemaControlsApi = windowAny.formDesignerSchemaControls || {};
-    const controlEmitters = schemaControlsApi.emitters || {};
+interface JsonSchema {
+    $schema?: string;
+    type: string;
+    properties: Record<string, unknown>;
+    required?: string[];
+    items?: Record<string, unknown>;
+    enum?: unknown[];
+    title?: string;
+    format?: string;
+    default?: unknown;
+    placeholder?: string;
+    minDate?: string | null;
+    maxDate?: string | null;
+    minDateTime?: string | null;
+    maxDateTime?: string | null;
+    [key: string]: unknown;
+}
 
-    windowAny.formDesignerSchema = {
-        generate() {
+interface LayoutItem {
+    id: string;
+    pointer: string;
+    stateKey: string;
+    widget: string;
+    label: string;
+    required?: boolean;
+    visible: boolean;
+    enabled: boolean;
+    validationMessage?: string | null;
+    hint?: string | null;
+    hintFormat?: 'text' | 'markdown';
+    help?: string | null;
+    helpFormat?: 'text' | 'markdown';
+    colSpan?: number;
+    minDate?: string | null;
+    maxDate?: string | null;
+    minDateTime?: string | null;
+    maxDateTime?: string | null;
+    autocompleteSourceType?: string | null;
+    autocompleteSourceUrl?: string | null;
+    autocompleteLabelField?: string | null;
+    autocompleteValueField?: string | null;
+    autocompleteSearchParam?: string | null;
+    options?: Array<{ label: string; value: unknown }>;
+}
+
+interface ControlSchema {
+    layout: LayoutItem[];
+    validation: {
+        messagePlacement: string;
+    };
+    theme: {
+        preset: string;
+        custom?: unknown;
+    };
+}
+
+interface FormDefinition {
+    id: string;
+    title: string;
+    version: string;
+    kind: string;
+    form: {
+        dataSchema: JsonSchema;
+        controlSchema: ControlSchema;
+    };
+    rules?: unknown[];
+}
+
+(function () {
+    const windowAny = (window as unknown) as Record<string, unknown>;
+    const schemaControlsApi = (windowAny.formDesignerSchemaControls || {}) as Record<string, unknown>;
+    const controlEmitters = (schemaControlsApi.emitters || {}) as Record<string, (ctx: any) => boolean>;
+
+    const formDesignerSchemaApi = {
+        generate(this: any): void {
             const previousSelection = this.selectedControlLocalId;
-            const allErrors = [];
-            const walkControls = (controls) => {
-                controls.forEach((c) => {
+            const allErrors: string[] = [];
+            const walkControls = (controls: unknown[]): void => {
+                (controls as any[]).forEach((c: any) => {
                     const errs = this.validateControl(c);
-                    errs.forEach((err) => allErrors.push(`${c.label || c.name}: ${err}`));
+                    errs.forEach((err: string) => allErrors.push(`${c.label || c.name}: ${err}`));
                     if (Array.isArray(c.children) && c.children.length > 0) {
                         walkControls(c.children);
                     }
@@ -27,21 +94,27 @@
             }
             this.selectControl(previousSelection);
 
-            const dataSchema = {
+            const dataSchema: JsonSchema = {
                 $schema: 'https://json-schema.org/draft/2020-12/schema',
                 type: 'object',
                 properties: {}
             };
-            const rootRequired = [];
-            const layout = [];
+            const rootRequired: string[] = [];
+            const layout: LayoutItem[] = [];
 
-            const processControls = (controls, schemaProperties, schemaRequired, layoutTarget, pointerBase) => {
-                controls.forEach((rawControl) => {
+            const processControls = (
+                controls: unknown[],
+                schemaProperties: Record<string, unknown>,
+                schemaRequired: string[],
+                layoutTarget: LayoutItem[],
+                pointerBase: string
+            ): void => {
+                (controls as any[]).forEach((rawControl: any) => {
                     const c = this.normalizeControl(rawControl);
                     const options = c.options || [];
                     const usesStaticOptions = !(c.widget === 'autocomplete' && c.autocompleteSourceType === 'remote');
                     const effectiveOptions = usesStaticOptions ? options : [];
-                    const optionValues = options.map((o) => o.value);
+                    const optionValues = options.map((o: any) => o.value);
 
                     const emitter = controlEmitters[c.widget];
                     if (emitter) {
@@ -67,21 +140,21 @@
                                 title: c.label
                             };
                             if (Array.isArray(c.defaultValue) && c.defaultValue.length > 0) {
-                                schemaProperties[c.name].default = c.defaultValue;
+                                (schemaProperties[c.name] as any).default = c.defaultValue;
                             }
                         } else if (c.type === 'number') {
-                            const nums = optionValues.map((o) => Number(o));
+                            const nums = optionValues.map((o: any) => Number(o));
                             schemaProperties[c.name] = { type: 'number', enum: nums, title: c.label };
                             if (c.defaultValue !== null && c.defaultValue !== undefined && c.defaultValue !== '') {
                                 const parsedDefault = Number(c.defaultValue);
                                 if (!Number.isNaN(parsedDefault)) {
-                                    schemaProperties[c.name].default = parsedDefault;
+                                    (schemaProperties[c.name] as any).default = parsedDefault;
                                 }
                             }
                         } else {
                             schemaProperties[c.name] = { type: c.type, enum: optionValues, title: c.label };
                             if (c.defaultValue !== null && c.defaultValue !== undefined && c.defaultValue !== '') {
-                                schemaProperties[c.name].default = c.defaultValue;
+                                (schemaProperties[c.name] as any).default = c.defaultValue;
                             }
                         }
                     } else {
@@ -89,16 +162,16 @@
                         const hasDefaultArray = Array.isArray(c.defaultValue);
                         const hasDefaultScalar = c.defaultValue !== null && c.defaultValue !== undefined && c.defaultValue !== '';
                         if (hasDefaultArray || hasDefaultScalar) {
-                            schemaProperties[c.name].default = c.defaultValue;
+                            (schemaProperties[c.name] as any).default = c.defaultValue;
                         }
                         if (c.placeholder) {
-                            schemaProperties[c.name].placeholder = c.placeholder;
+                            (schemaProperties[c.name] as any).placeholder = c.placeholder;
                         }
                         if (c.widget === 'date') {
-                            schemaProperties[c.name].format = 'date';
+                            (schemaProperties[c.name] as any).format = 'date';
                         }
                         if (c.widget === 'datetime') {
-                            schemaProperties[c.name].format = 'date-time';
+                            (schemaProperties[c.name] as any).format = 'date-time';
                         }
                     }
 
@@ -126,11 +199,12 @@
                         minDateTime: c.widget === 'datetime' ? (c.minDateTime || null) : null,
                         maxDateTime: c.widget === 'datetime' ? (c.maxDateTime || null) : null,
                         autocompleteSourceType: c.widget === 'autocomplete' ? (c.autocompleteSourceType || 'static') : null,
-                        autocompleteSourceUrl: c.widget === 'autocomplete' && c.autocompleteSourceType === 'remote' ? (c.autocompleteSourceUrl || null) : null,
+                        autocompleteSourceUrl:
+                            c.widget === 'autocomplete' && c.autocompleteSourceType === 'remote' ? (c.autocompleteSourceUrl || null) : null,
                         autocompleteLabelField: c.widget === 'autocomplete' ? (c.autocompleteLabelField || 'label') : null,
                         autocompleteValueField: c.widget === 'autocomplete' ? (c.autocompleteValueField || 'value') : null,
                         autocompleteSearchParam: c.widget === 'autocomplete' ? (c.autocompleteSearchParam || 'q') : null,
-                        options: effectiveOptions.map((o) => ({
+                        options: effectiveOptions.map((o: any) => ({
                             label: o.label,
                             value: c.type === 'number' ? Number(o.value) : o.value
                         }))
@@ -144,7 +218,7 @@
                 dataSchema.required = rootRequired;
             }
 
-            const controlSchema = {
+            const controlSchema: ControlSchema = {
                 layout,
                 validation: {
                     messagePlacement: this.validationDisplayMode || 'inline-summary'
@@ -155,7 +229,7 @@
                 }
             };
 
-            const definition = {
+            const definition: FormDefinition = {
                 id: this.definitionKey || 'generated-definition',
                 title: this.definitionKey || 'Generated Form',
                 version: '1.0.0',
@@ -166,11 +240,12 @@
                 }
             };
 
-            let rules = [];
+            let rules: unknown[] = [];
             try {
-                rules = typeof this.normalizedRulesPayload === 'function'
-                    ? this.normalizedRulesPayload()
-                    : [];
+                rules =
+                    typeof this.normalizedRulesPayload === 'function'
+                        ? this.normalizedRulesPayload()
+                        : [];
             } catch (err) {
                 this.validationErrors = [
                     `Rules validation failed: ${err instanceof Error ? err.message : String(err)}`
@@ -185,4 +260,6 @@
             this.definitionJson = JSON.stringify(definition, null, 2);
         }
     };
+
+    windowAny.formDesignerSchema = formDesignerSchemaApi;
 })();

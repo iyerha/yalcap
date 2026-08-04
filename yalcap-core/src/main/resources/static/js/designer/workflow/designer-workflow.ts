@@ -1,17 +1,33 @@
-window.workflowStepHooks = window.workflowStepHooks || {};
-window.registerWorkflowStepHook = function registerWorkflowStepHook(type, hook) {
+// Runtime module type definitions
+
+
+(function() {
+    const windowAny = window as any;
+
+/**
+ * Register a workflow step hook for a specific step type
+ */
+windowAny.registerWorkflowStepHook = function registerWorkflowStepHook(type: string, hook: WorkflowStepHook): void {
     const key = String(type || '').trim().toLowerCase();
     if (!key || !hook || typeof hook !== 'object') {
         return;
     }
 
-    const existing = window.workflowStepHooks[key] || {};
-    window.workflowStepHooks[key] = Object.assign({}, existing, hook);
+    if (!windowAny.workflowStepHooks || typeof windowAny.workflowStepHooks !== 'object') {
+        windowAny.workflowStepHooks = {};
+    }
+
+    const existing = windowAny.workflowStepHooks[key] || {};
+    windowAny.workflowStepHooks[key] = Object.assign({}, existing, hook);
 };
 
-function workflowDesigner() {
-    const designer = {
+/**
+ * Factory function to create a workflow designer instance
+ */
+function workflowDesigner(): WorkflowDesigner {
+    const designer: WorkflowDesigner = {
         definitionKey: 'example-review',
+        workflowTitle: '',
         stepTypes: [],
         steps: [],
         selectedNodeId: null,
@@ -34,24 +50,30 @@ function workflowDesigner() {
         canvasInteractionsBound: false,
         isHydratingGraph: false,
 
-        getStepHook(type) {
+        /**
+         * Get the hook object for a step type
+         */
+        getStepHook(type: string): WorkflowStepHook | null {
             const key = String(type || '').trim().toLowerCase();
             if (!key) {
                 return null;
             }
 
-            const hooks = window.workflowStepHooks || {};
+            const hooks = windowAny.workflowStepHooks || {};
             const hook = hooks[key];
             return hook && typeof hook === 'object' ? hook : null;
         },
 
-        invokeStepHook(type, eventName, payload) {
+        /**
+         * Invoke a hook callback for a step type
+         */
+        invokeStepHook(type: string, eventName: string, payload?: any): void {
             const hook = this.getStepHook(type);
             if (!hook) {
                 return;
             }
 
-            const callback = hook[eventName];
+            const callback = hook[eventName] as any;
             if (typeof callback !== 'function') {
                 return;
             }
@@ -63,9 +85,12 @@ function workflowDesigner() {
             }
         },
 
-        init() {
-            this.definitionKey = window.workflowDesignerInitialKey || this.definitionKey;
-            this.stepTypes = Array.isArray(window.workflowDesignerStepTypes) ? window.workflowDesignerStepTypes : [];
+        /**
+         * Initialize workflow designer from page state
+         */
+        init(): void {
+            this.definitionKey = windowAny.workflowDesignerInitialKey || this.definitionKey;
+            this.stepTypes = Array.isArray(windowAny.workflowDesignerStepTypes) ? windowAny.workflowDesignerStepTypes : [];
             if (!this.stepTypes.length) {
                 this.stepTypes = [{
                     type: 'form',
@@ -75,9 +100,10 @@ function workflowDesigner() {
                     defaultConfig: {}
                 }];
             }
-            const initial = window.workflowDesignerInitialDefinition;
+            const initial = windowAny.workflowDesignerInitialDefinition;
+            this.workflowTitle = initial && initial.title ? String(initial.title).trim() : '';
             if (initial && Array.isArray(initial.steps) && initial.steps.length > 0) {
-                this.steps = initial.steps.map((s, idx) => this.normalizeStep(s, idx));
+                this.steps = initial.steps.map((s: any, idx: number) => this.normalizeStep(s, idx));
             } else {
                 this.steps = [this.normalizeStep({ type: this.stepTypes[0].type }, 1)];
             }
@@ -90,7 +116,10 @@ function workflowDesigner() {
             this.refreshRuntimePreview();
         },
 
-        async refreshRuntimePreview() {
+        /**
+         * Refresh the runtime preview of the workflow
+         */
+        async refreshRuntimePreview(): Promise<void> {
             this.generate();
             this.runtimePreviewLoading = true;
             this.runtimePreviewError = '';
@@ -101,13 +130,13 @@ function workflowDesigner() {
                     throw new Error('Definition key is required.');
                 }
                 
-                const tenantId = window.tenantId;
+                const tenantId = windowAny.tenantId;
                 const response = await fetch('/api/definitions/' + encodeURIComponent(definitionKey) + '/resolved/html', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
-                        'X-Tenant-Id': tenantId
+                        'X-Tenant-Id': tenantId || ''
                     },
                     body: JSON.stringify({ formInitialization: true })
                 });
@@ -119,18 +148,18 @@ function workflowDesigner() {
 
                 await this.loadRuntimeAssetsFromPreviewHtml(html);
                 this.runtimePreviewHtml = html;
-                window.setTimeout(function () {
-                    var autocompleteRuntime = window.runtimeAutocomplete || window.autocompleteRuntime;
+                windowAny.setTimeout(() => {
+                    const autocompleteRuntime = windowAny.runtimeAutocomplete || windowAny.autocompleteRuntime;
                     if (autocompleteRuntime && typeof autocompleteRuntime.bindAll === 'function') {
                         autocompleteRuntime.bindAll();
                     }
 
-                    if (window.runtimeSections && typeof window.runtimeSections.bindAll === 'function') {
-                        window.runtimeSections.bindAll();
+                    if (windowAny.runtimeSections && typeof windowAny.runtimeSections.bindAll === 'function') {
+                        windowAny.runtimeSections.bindAll();
                     }
 
-                    if (window.runtimeRepeats && typeof window.runtimeRepeats.bindAll === 'function') {
-                        window.runtimeRepeats.bindAll();
+                    if (windowAny.runtimeRepeats && typeof windowAny.runtimeRepeats.bindAll === 'function') {
+                        windowAny.runtimeRepeats.bindAll();
                     }
                 }, 0);
             } catch (error) {
@@ -141,77 +170,88 @@ function workflowDesigner() {
             }
         },
 
-        parseRuntimeAssetList(raw) {
+        /**
+         * Parse a comma-separated list of runtime assets
+         */
+        parseRuntimeAssetList(raw: string): string[] {
             return String(raw || '')
                 .split(',')
-                .map(function (item) { return String(item || '').trim(); })
+                .map((item: string) => String(item || '').trim())
                 .filter(Boolean);
         },
 
-        normalizeAssetUrl(assetPath) {
+        /**
+         * Normalize an asset path to absolute URL
+         */
+        normalizeAssetUrl(assetPath: string): string {
             try {
-                return new URL(String(assetPath || '').trim(), window.location.origin).href;
+                return new URL(String(assetPath || '').trim(), windowAny.location.origin).href;
             } catch (_) {
                 return '';
             }
         },
 
-        ensureRuntimeCssAsset(assetPath) {
-            var normalized = this.normalizeAssetUrl(assetPath);
+        /**
+         * Ensure a CSS asset is loaded
+         */
+        ensureRuntimeCssAsset(assetPath: string): void {
+            const normalized = this.normalizeAssetUrl(assetPath);
             if (!normalized) {
                 return;
             }
 
-            var links = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
-            var alreadyLoaded = links.some(function (link) {
-                return link.href === normalized;
-            });
+            const links = Array.from(document.querySelectorAll('link[rel="stylesheet"]')) as HTMLLinkElement[];
+            const alreadyLoaded = links.some((link) => link.href === normalized);
             if (alreadyLoaded) {
                 return;
             }
 
-            var link = document.createElement('link');
+            const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.href = normalized;
             link.setAttribute('data-runtime-asset', 'css');
             document.head.appendChild(link);
         },
 
-        ensureRuntimeJsAsset(assetPath) {
-            var normalized = this.normalizeAssetUrl(assetPath);
+        /**
+         * Ensure a JavaScript asset is loaded
+         */
+        ensureRuntimeJsAsset(assetPath: string): Promise<void> {
+            const normalized = this.normalizeAssetUrl(assetPath);
             if (!normalized) {
                 return Promise.resolve();
             }
 
-            var existing = Array.from(document.querySelectorAll('script[src]')).find(function (script) {
-                return script.src === normalized;
-            });
+            const existing = Array.from(document.querySelectorAll('script[src]')).find((script: Element) => {
+                return (script as HTMLScriptElement).src === normalized;
+            }) as HTMLScriptElement | undefined;
+
             if (existing) {
                 if (existing.dataset && existing.dataset.loaded === 'true') {
                     return Promise.resolve();
                 }
-                return new Promise(function (resolve) {
+                return new Promise((resolve) => {
                     if (existing.dataset && existing.dataset.loading === 'true') {
-                        existing.addEventListener('load', function () { resolve(); }, { once: true });
-                        existing.addEventListener('error', function () { resolve(); }, { once: true });
+                        existing.addEventListener('load', () => resolve(), { once: true });
+                        existing.addEventListener('error', () => resolve(), { once: true });
                         return;
                     }
                     resolve();
                 });
             }
 
-            return new Promise(function (resolve) {
-                var script = document.createElement('script');
+            return new Promise((resolve) => {
+                const script = document.createElement('script');
                 script.src = normalized;
                 script.defer = true;
                 script.dataset.runtimeAsset = 'js';
                 script.dataset.loading = 'true';
-                script.addEventListener('load', function () {
+                script.addEventListener('load', () => {
                     script.dataset.loading = 'false';
                     script.dataset.loaded = 'true';
                     resolve();
                 }, { once: true });
-                script.addEventListener('error', function () {
+                script.addEventListener('error', () => {
                     script.dataset.loading = 'false';
                     resolve();
                 }, { once: true });
@@ -219,30 +259,36 @@ function workflowDesigner() {
             });
         },
 
-        async loadRuntimeAssetsFromPreviewHtml(html) {
-            var documentFragment = new DOMParser().parseFromString(String(html || ''), 'text/html');
-            var host = documentFragment.querySelector('[data-runtime-js-assets], [data-runtime-css-assets]');
+        /**
+         * Load runtime assets referenced in preview HTML
+         */
+        async loadRuntimeAssetsFromPreviewHtml(html: string): Promise<void> {
+            const documentFragment = new DOMParser().parseFromString(String(html || ''), 'text/html');
+            const host = documentFragment.querySelector('[data-runtime-js-assets], [data-runtime-css-assets]');
             if (!host) {
                 return;
             }
 
-            var cssAssets = this.parseRuntimeAssetList(host.getAttribute('data-runtime-css-assets'));
-            var jsAssets = this.parseRuntimeAssetList(host.getAttribute('data-runtime-js-assets'));
+            const cssAssets = this.parseRuntimeAssetList(host.getAttribute('data-runtime-css-assets') || '');
+            const jsAssets = this.parseRuntimeAssetList(host.getAttribute('data-runtime-js-assets') || '');
 
-            cssAssets.forEach((asset) => this.ensureRuntimeCssAsset(asset));
+            cssAssets.forEach((asset: string) => this.ensureRuntimeCssAsset(asset));
             if (jsAssets.length > 0) {
-                await Promise.all(jsAssets.map((asset) => this.ensureRuntimeJsAsset(asset)));
+                await Promise.all(jsAssets.map((asset: string) => this.ensureRuntimeJsAsset(asset)));
             }
         },
 
-        bindPublishForm() {
-            const form = document.querySelector('form[action], .json-card form');
+        /**
+         * Bind form submit handler for publishing workflow
+         */
+        bindPublishForm(): void {
+            const form = document.querySelector('form[action], .json-card form') as HTMLFormElement | null;
             if (!form || form.dataset.workflowPublishBound === 'true') {
                 return;
             }
 
             form.dataset.workflowPublishBound = 'true';
-            form.addEventListener('submit', async (event) => {
+            form.addEventListener('submit', async (event: Event) => {
                 event.preventDefault();
                 this.generate();
 
@@ -277,26 +323,37 @@ function workflowDesigner() {
                     this.publishMessage = error instanceof Error ? error.message : String(error);
                 }
             });
-        }
+        },
+
+        // Placeholder methods - implemented by mixins
+        generate(): void {},
+        normalizeStep(step: any, index: number): WorkflowStep { return { nodeId: '' }; },
+        refreshSelectedStepView(): void {},
+        bindPaletteDragSources(): void {},
+        ensureCanvasInteractions(): void {},
+        initEditorWhenReady(attempt: number): void {}
     };
 
-    if (window.workflowDesignerPaletteMixin) {
-        window.workflowDesignerPaletteMixin(designer);
+    // Apply mixins
+    if (windowAny.workflowDesignerPaletteMixin) {
+        windowAny.workflowDesignerPaletteMixin(designer);
     }
-    if (window.workflowDesignerPropertiesMixin) {
-        window.workflowDesignerPropertiesMixin(designer);
+    if (windowAny.workflowDesignerPropertiesMixin) {
+        windowAny.workflowDesignerPropertiesMixin(designer);
     }
-    if (window.workflowDesignerSchemaMixin) {
-        window.workflowDesignerSchemaMixin(designer);
+    if (windowAny.workflowDesignerSchemaMixin) {
+        windowAny.workflowDesignerSchemaMixin(designer);
     }
-    if (window.workflowDesignerCanvasMixin) {
-        window.workflowDesignerCanvasMixin(designer);
+    if (windowAny.workflowDesignerCanvasMixin) {
+        windowAny.workflowDesignerCanvasMixin(designer);
     }
-    if (window.workflowDesignerIndexConfigMixin) {
-        window.workflowDesignerIndexConfigMixin(designer);
+    if (windowAny.workflowDesignerIndexConfigMixin) {
+        windowAny.workflowDesignerIndexConfigMixin(designer);
     }
 
     return designer;
 }
 
-window.workflowDesigner = workflowDesigner;
+// Export to global scope
+windowAny.workflowDesigner = workflowDesigner;
+})();

@@ -21,6 +21,9 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
     @Column("form_key")
     private String formKey;
 
+    @Column("title")
+    private String title;
+
     @Column("control_schema")
     private String controlSchema;  // HTML
 
@@ -49,6 +52,7 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
 
     public FormDefinitionEntity(UUID id,
                               String formKey,
+                              String title,
                               String controlSchema,
                               JsonNode dataSchema,
                               Integer versionNumber,
@@ -58,6 +62,7 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
                               String changeMessage) {
         this.id = id;
         this.formKey = formKey;
+        this.title = title;
         this.controlSchema = controlSchema;
         this.dataSchema = dataSchema;
         this.versionNumber = versionNumber;
@@ -81,6 +86,14 @@ public class FormDefinitionEntity implements TenantAware, IdAware {
 
     public void setFormKey(String formKey) {
         this.formKey = formKey;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     public String getControlSchema() {

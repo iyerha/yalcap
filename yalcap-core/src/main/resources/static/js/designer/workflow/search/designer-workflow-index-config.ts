@@ -1,26 +1,58 @@
-window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMixin(target) {
+// @ts-check
+
+interface FormDefinition {
+    controls?: Record<string, unknown>[];
+    [key: string]: unknown;
+}
+
+interface WorkflowDesignerIndexConfigApi {
+    indexConfigLoading: boolean;
+    indexConfigError: string;
+    indexConfigFormKey: string;
+    currentIndexConfig: IndexConfig | null;
+    steps: WorkflowStep[];
+    selectedNodeId: string;
+    generate: () => void;
+
+    getSelectedFormStep(): WorkflowStep | null;
+    loadFormDefinition(formKey: string): Promise<FormDefinition | null>;
+    extractControlsAsIndexFields(
+        controls: Record<string, unknown>[],
+        parentPath: string
+    ): IndexField[];
+    generateDefaultIndexConfig(formDefinition: FormDefinition): IndexConfig;
+    refreshIndexConfig(): Promise<void>;
+    toggleFieldSearchable(fieldId: string): void;
+    toggleFieldDisplayable(fieldId: string): void;
+    syncIndexConfigToStep(): void;
+    resetIndexConfig(): Promise<void>;
+}
+
+(window as any).workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMixin(
+    target: any
+): void {
     Object.assign(target, {
         indexConfigLoading: false,
         indexConfigError: '',
         indexConfigFormKey: '',
         currentIndexConfig: null,
 
-        getSelectedFormStep() {
-            const step = this.steps.find((s) => String(s.nodeId) === String(this.selectedNodeId));
+        getSelectedFormStep(this: any): WorkflowStep | null {
+            const step = this.steps.find((s: WorkflowStep) => String(s.nodeId) === String(this.selectedNodeId));
             if (!step || String(step.type || '').trim() !== 'form') {
                 return null;
             }
             return step;
         },
 
-        async loadFormDefinition(formKey) {
+        async loadFormDefinition(this: any, formKey: string): Promise<FormDefinition | null> {
             const key = String(formKey || '').trim();
             if (!key) {
                 return null;
             }
 
             try {
-                const tenantId = window.tenantId;
+                const tenantId = (window as any).tenantId;
                 const response = await fetch('/api/definitions/' + encodeURIComponent(key), {
                     method: 'GET',
                     headers: {
@@ -41,13 +73,17 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
             }
         },
 
-        extractControlsAsIndexFields(controls, parentPath) {
-            const fields = [];
+        extractControlsAsIndexFields(
+            this: any,
+            controls: Record<string, unknown>[],
+            parentPath: string
+        ): IndexField[] {
+            const fields: IndexField[] = [];
             if (!Array.isArray(controls)) {
                 return fields;
             }
 
-            controls.forEach((control) => {
+            controls.forEach((control: any) => {
                 const controlType = String(control.type || '').trim().toLowerCase();
                 const name = String(control.name || '').trim();
                 const label = String(control.label || '').trim();
@@ -57,9 +93,14 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
                 }
 
                 const path = parentPath ? parentPath + '.' + name : name;
-                const fieldType = controlType === 'table' || controlType === 'repeat' ? 'nested' : controlType === 'group' ? 'group' : 'text';
+                const fieldType: 'nested' | 'group' | 'text' =
+                    controlType === 'table' || controlType === 'repeat'
+                        ? 'nested'
+                        : controlType === 'group'
+                        ? 'group'
+                        : 'text';
 
-                const field = {
+                const field: IndexField = {
                     id: control.id || '',
                     name: name,
                     path: path,
@@ -68,7 +109,10 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
                     displayable: true
                 };
 
-                if ((controlType === 'table' || controlType === 'repeat' || controlType === 'group') && Array.isArray(control.children)) {
+                if (
+                    (controlType === 'table' || controlType === 'repeat' || controlType === 'group') &&
+                    Array.isArray(control.children)
+                ) {
                     const childPath = fieldType === 'nested' ? path + '[]' : path;
                     field.childFields = this.extractControlsAsIndexFields(control.children, childPath);
                 }
@@ -79,7 +123,7 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
             return fields;
         },
 
-        generateDefaultIndexConfig(formDefinition) {
+        generateDefaultIndexConfig(this: any, formDefinition: FormDefinition): IndexConfig {
             if (!formDefinition || !Array.isArray(formDefinition.controls)) {
                 return { rootFields: [] };
             }
@@ -89,7 +133,7 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
             };
         },
 
-        async refreshIndexConfig() {
+        async refreshIndexConfig(this: any): Promise<void> {
             const step = this.getSelectedFormStep();
             if (!step) {
                 this.currentIndexConfig = null;
@@ -134,12 +178,12 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
             }
         },
 
-        toggleFieldSearchable(fieldId) {
+        toggleFieldSearchable(this: any, fieldId: string): void {
             if (!this.currentIndexConfig || !Array.isArray(this.currentIndexConfig.rootFields)) {
                 return;
             }
 
-            const findAndToggle = (fields) => {
+            const findAndToggle = (fields: IndexField[]): boolean => {
                 for (let field of fields) {
                     if (field.id === fieldId) {
                         field.searchable = !field.searchable;
@@ -156,12 +200,12 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
             this.syncIndexConfigToStep();
         },
 
-        toggleFieldDisplayable(fieldId) {
+        toggleFieldDisplayable(this: any, fieldId: string): void {
             if (!this.currentIndexConfig || !Array.isArray(this.currentIndexConfig.rootFields)) {
                 return;
             }
 
-            const findAndToggle = (fields) => {
+            const findAndToggle = (fields: IndexField[]): boolean => {
                 for (let field of fields) {
                     if (field.id === fieldId) {
                         field.displayable = !field.displayable;
@@ -178,7 +222,7 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
             this.syncIndexConfigToStep();
         },
 
-        syncIndexConfigToStep() {
+        syncIndexConfigToStep(this: any): void {
             const step = this.getSelectedFormStep();
             if (step && this.currentIndexConfig) {
                 step.indexConfig = JSON.parse(JSON.stringify(this.currentIndexConfig));
@@ -186,7 +230,7 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
             }
         },
 
-        async resetIndexConfig() {
+        async resetIndexConfig(this: any): Promise<void> {
             const step = this.getSelectedFormStep();
             if (!step) {
                 return;
@@ -210,5 +254,5 @@ window.workflowDesignerIndexConfigMixin = function workflowDesignerIndexConfigMi
                 this.indexConfigError = error instanceof Error ? error.message : String(error);
             }
         }
-    });
+    } as WorkflowDesignerIndexConfigApi);
 };

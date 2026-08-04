@@ -58,18 +58,19 @@ class DesignerControllerTest {
                 controlTypeWithAssets("b", ControlTypeClientAssets.designerJsOnly("/js/designer/custom-a.js")),
                 controlTypeWithAssets("c", ControlTypeClientAssets.designerCssOnly("/css/designer/custom-a.css"))
         ));
-        
+        ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
+
         FormDefinitionService formService = new FormDefinitionService(
                 definitionFilesystem,
                 formRepository,
                 controlRegistry,
-                objectMapper
+                objectMapper,
+                eventPublisher
         );
 
         WorkflowDefinitionRepository workflowRepository = Mockito.mock(WorkflowDefinitionRepository.class);
         AssetStorageService assetStorageService = Mockito.mock(AssetStorageService.class);
-        ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
-        
+    
         WorkflowDefinitionService workflowService = new WorkflowDefinitionService(
                 definitionFilesystem,
                 workflowRepository,
@@ -90,7 +91,7 @@ class DesignerControllerTest {
         );
 
         Model model = new ExtendedModelMap();
-        String view = controller.formDesigner(null, "sample", model);
+        String view = controller.formDesigner("sample", model);
 
         assertEquals("designer/form", view);
 
@@ -113,17 +114,17 @@ class DesignerControllerTest {
 
         DefinitionFilesystem definitionFilesystem = Mockito.mock(DefinitionFilesystem.class);
         FormDefinitionRepository formRepository = Mockito.mock(FormDefinitionRepository.class);
-        
+        ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
         FormDefinitionService formService = new FormDefinitionService(
             definitionFilesystem,
             formRepository,
             new ControlTypeRegistry(List.of()),
-            objectMapper
+            objectMapper,
+            eventPublisher
         );
 
         WorkflowDefinitionRepository workflowRepository = Mockito.mock(WorkflowDefinitionRepository.class);
         AssetStorageService assetStorageService = Mockito.mock(AssetStorageService.class);
-        ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
         
         WorkflowDefinitionService workflowService = new WorkflowDefinitionService(
             definitionFilesystem,
@@ -160,7 +161,7 @@ class DesignerControllerTest {
         );
 
         Model model = new ExtendedModelMap();
-        String view = controller.workflowDesigner(null, "sample", model);
+        String view = controller.workflowDesigner("sample", model);
 
         assertEquals("designer/workflow", view);
 

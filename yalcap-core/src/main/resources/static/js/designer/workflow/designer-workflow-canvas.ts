@@ -1,6 +1,124 @@
-window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target) {
+// @ts-check
+
+interface WorkflowStep {
+    id?: string;
+    title?: string;
+    type?: string;
+    next?: string;
+    nodeId: string;
+    routing?: Routing;
+    ui?: UiConfig;
+    designer?: DesignerInfo;
+    indexConfig?: IndexConfig;
+}
+
+interface PointerDragState {
+    type: string;
+    startX: number;
+    startY: number;
+    clientX: number;
+    clientY: number;
+    dragging: boolean;
+    ghost: HTMLElement | null;
+    pointerId?: number;
+    cleanup?: () => void;
+}
+
+interface DropPosition {
+    x: number;
+    y: number;
+}
+
+interface PendingPaletteInsert {
+    type: string;
+    position: DropPosition | null;
+}
+
+interface StepTypeDescriptor {
+    displayName?: string;
+}
+
+interface GraphNode {
+    pos_x: number | string;
+    pos_y: number | string;
+    class: string;
+    data?: {
+        stepId?: string;
+        stepTitle?: string;
+        stepType?: string;
+    };
+    outputs?: Record<string, { connections: Array<{ node: string | number; output: string }> }>;
+    [key: string]: unknown;
+}
+
+interface GraphConnection {
+    output_id: string | number;
+    input_id: string | number;
+    output_class: string;
+    input_class: string;
+}
+
+interface WorkflowDesignerCanvasApi {
+    canvasInteractionsBound: boolean;
+    canvasElement: HTMLElement | null;
+    canvasCardElement: HTMLElement | null;
+    editor: any;
+    useFallbackCanvas: boolean;
+    isHydratingGraph: boolean;
+    selectedNodeId: string | null;
+    pointerDragState: PointerDragState | null;
+    armedPaletteType: string | null;
+    pendingPaletteInsert: PendingPaletteInsert | null;
+    steps: WorkflowStep[];
+    definitionKey: string;
+    workflowTitle: string;
+    definitionJson: string;
+    getStepTypeDescriptor: (type: string) => StepTypeDescriptor | null;
+    getStepTypeOutputCount: (type: string) => number;
+    normalizeStep: (step: WorkflowStep, idx?: number) => WorkflowStep;
+    normalizeNodeId: (id: any) => string;
+    generate: () => void;
+    refreshSelectedStepView: () => void;
+
+    ensureCanvasInteractions: () => void;
+    initEditorWhenReady: (attempt: number) => void;
+    initializeDrawflow: () => void;
+    activateFallbackCanvas: () => void;
+    renderFallbackCanvas: () => void;
+    isInsideCanvas: (clientX: number, clientY: number) => boolean;
+    updateCanvasPointerDropHint: (clientX: number, clientY: number) => void;
+    startPointerPaletteDrag: (type: string, event: PointerEvent) => void;
+    finishPointerPaletteDrag: (cancelled: boolean) => void;
+    createPointerDragGhost: (type: string) => HTMLElement;
+    updatePointerDragGhost: (clientX: number, clientY: number) => void;
+    renderGraphFromSteps: () => void;
+    addNodeFromPalette: (type: string, dropPosition?: DropPosition) => void;
+    getGraphNode: (nodeId: string | number) => GraphNode | null;
+    getGraphNodeByStepId: (stepId: string) => GraphNode | null;
+    getWorkflowNodeClass: (step: WorkflowStep) => string;
+    getWorkflowOutputCount: (step: WorkflowStep) => number;
+    getWorkflowTransitionTargets: (step: WorkflowStep) => Record<string, string>;
+    enforceSingleConnectionPerOutput: (connection: GraphConnection) => void;
+    syncTransitionsFromGraph: () => void;
+    renderNodeTemplate: (step: WorkflowStep) => string;
+    escapeHtml: (value: unknown) => string;
+    selectWorkflowNode?: (nodeId: string) => void;
+}
+
+(window as any).workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target: any): void {
     Object.assign(target, {
-        ensureCanvasInteractions() {
+        canvasInteractionsBound: false,
+        canvasElement: null,
+        canvasCardElement: null,
+        editor: null,
+        useFallbackCanvas: false,
+        isHydratingGraph: false,
+        selectedNodeId: null,
+        pointerDragState: null,
+        armedPaletteType: null,
+        pendingPaletteInsert: null,
+
+        ensureCanvasInteractions(this: any): void {
             if (this.canvasInteractionsBound) {
                 return;
             }
@@ -11,26 +129,30 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
 
             this.canvasElement = canvas;
             this.canvasCardElement = canvas.closest('.canvas-card');
-            canvas.addEventListener('click', (event) => {
-                const nodeElement = event.target && event.target.closest ? event.target.closest('.drawflow-node') : null;
+            canvas.addEventListener('click', (event: MouseEvent) => {
+                const nodeElement = (event.target as HTMLElement)?.closest?.('.drawflow-node') as HTMLElement | null;
                 if (!nodeElement) {
                     return;
                 }
                 this.selectWorkflowNode(nodeElement.id);
             });
 
-            document.addEventListener('pointerdown', (event) => {
-                const nodeElement = event.target && event.target.closest ? event.target.closest('.drawflow-node') : null;
-                if (!nodeElement) {
-                    return;
-                }
-                this.selectWorkflowNode(nodeElement.id);
-            }, true);
+            document.addEventListener(
+                'pointerdown',
+                (event: PointerEvent) => {
+                    const nodeElement = (event.target as HTMLElement)?.closest?.('.drawflow-node') as HTMLElement | null;
+                    if (!nodeElement) {
+                        return;
+                    }
+                    this.selectWorkflowNode(nodeElement.id);
+                },
+                true
+            );
 
             this.canvasInteractionsBound = true;
         },
 
-        initEditorWhenReady(attempt) {
+        initEditorWhenReady(this: any, attempt: number): void {
             if (this.editor) {
                 return;
             }
@@ -43,7 +165,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 return;
             }
 
-            if (typeof Drawflow === 'undefined') {
+            if (typeof (window as any).Drawflow === 'undefined') {
                 if (attempt < 20) {
                     window.setTimeout(() => this.initEditorWhenReady(attempt + 1), 100);
                     return;
@@ -53,7 +175,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 if (this.pendingPaletteInsert) {
                     const pending = this.pendingPaletteInsert;
                     this.pendingPaletteInsert = null;
-                    this.addNodeFromPalette(pending.type, pending.position);
+                    this.addNodeFromPalette(pending.type, pending.position ?? undefined);
                 }
                 return;
             }
@@ -64,30 +186,30 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             if (this.pendingPaletteInsert) {
                 const pending = this.pendingPaletteInsert;
                 this.pendingPaletteInsert = null;
-                this.addNodeFromPalette(pending.type, pending.position);
+                this.addNodeFromPalette(pending.type, pending.position ?? undefined);
             }
         },
 
-        initializeDrawflow() {
+        initializeDrawflow(this: any): void {
             const canvas = document.getElementById('drawflowCanvas');
-            if (!canvas || typeof Drawflow === 'undefined') {
+            if (!canvas || typeof (window as any).Drawflow === 'undefined') {
                 return;
             }
 
             this.canvasElement = canvas;
             this.canvasCardElement = canvas.closest('.canvas-card');
 
-            this.editor = new Drawflow(canvas);
+            this.editor = new (window as any).Drawflow(canvas);
             this.editor.reroute = true;
             this.editor.start();
 
-            this.editor.on('nodeSelected', (nodeId) => {
+            this.editor.on('nodeSelected', (nodeId: string | number) => {
                 this.selectWorkflowNode(nodeId);
             });
 
-            this.editor.on('nodeRemoved', (nodeId) => {
+            this.editor.on('nodeRemoved', (nodeId: string | number) => {
                 const normalizedNodeId = this.normalizeNodeId(nodeId);
-                this.steps = this.steps.filter((step) => String(step.nodeId) !== normalizedNodeId);
+                this.steps = this.steps.filter((step: WorkflowStep) => String(step.nodeId) !== normalizedNodeId);
                 if (String(this.selectedNodeId) === normalizedNodeId) {
                     this.selectedNodeId = null;
                     this.refreshSelectedStepView();
@@ -99,7 +221,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 this.generate();
             });
 
-            this.editor.on('connectionCreated', (connection) => {
+            this.editor.on('connectionCreated', (connection: GraphConnection) => {
                 if (this.isHydratingGraph) {
                     return;
                 }
@@ -116,11 +238,14 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 this.generate();
             });
 
-            this.editor.on('nodeMoved', (nodeId) => {
+            this.editor.on('nodeMoved', (nodeId: string | number) => {
                 const normalizedNodeId = this.normalizeNodeId(nodeId);
                 const graphNode = this.getGraphNode(normalizedNodeId);
-                const step = this.steps.find((item) => String(item.nodeId) === normalizedNodeId);
+                const step = this.steps.find((item: WorkflowStep) => String(item.nodeId) === normalizedNodeId);
                 if (graphNode && step) {
+                    if (!step.designer) {
+                        step.designer = { position: { x: 0, y: 0 } };
+                    }
                     step.designer.position = {
                         x: Number(graphNode.pos_x) || 0,
                         y: Number(graphNode.pos_y) || 0
@@ -129,14 +254,14 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 }
             });
 
-            if (this.editor.precanvas && !this.editor.precanvas.dataset.workflowDropBound) {
-                this.editor.precanvas.dataset.workflowDropBound = 'true';
-                this.editor.precanvas.addEventListener('dragenter', (event) => event.preventDefault());
-                this.editor.precanvas.addEventListener('dragover', (event) => event.preventDefault());
+            if (this.editor.precanvas && !(this.editor.precanvas as any).dataset.workflowDropBound) {
+                (this.editor.precanvas as any).dataset.workflowDropBound = 'true';
+                this.editor.precanvas.addEventListener('dragenter', (event: DragEvent) => event.preventDefault());
+                this.editor.precanvas.addEventListener('dragover', (event: DragEvent) => event.preventDefault());
             }
         },
 
-        activateFallbackCanvas() {
+        activateFallbackCanvas(this: any): void {
             if (this.useFallbackCanvas) {
                 return;
             }
@@ -144,13 +269,13 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             this.renderFallbackCanvas();
         },
 
-        renderFallbackCanvas() {
+        renderFallbackCanvas(this: any): void {
             const canvas = this.canvasElement || document.getElementById('drawflowCanvas');
             if (!canvas) {
                 return;
             }
 
-            let layer = canvas.querySelector('.fallback-canvas-layer');
+            let layer = canvas.querySelector('.fallback-canvas-layer') as HTMLElement | null;
             if (!layer) {
                 layer = document.createElement('div');
                 layer.className = 'fallback-canvas-layer';
@@ -164,39 +289,42 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             edges.setAttribute('width', '100%');
             layer.appendChild(edges);
 
-            const byStepId = new Map();
-            this.steps.forEach((step) => {
+            const byStepId = new Map<string, WorkflowStep>();
+            this.steps.forEach((step: WorkflowStep) => {
                 byStepId.set(String(step.id || '').trim(), step);
             });
 
-            this.steps.forEach((step) => {
+            this.steps.forEach((step: WorkflowStep) => {
                 const target = byStepId.get(String(step.next || '').trim());
                 if (!target) {
                     return;
                 }
 
-                const fromX = (Number(step.designer && step.designer.position && step.designer.position.x) || 80) + 180;
-                const fromY = (Number(step.designer && step.designer.position && step.designer.position.y) || 120) + 34;
-                const toX = (Number(target.designer && target.designer.position && target.designer.position.x) || 80);
-                const toY = (Number(target.designer && target.designer.position && target.designer.position.y) || 120) + 34;
+                const fromX = (Number((step.designer?.position?.x as any) || 0) || 80) + 180;
+                const fromY = (Number((step.designer?.position?.y as any) || 0) || 120) + 34;
+                const toX = (Number((target.designer?.position?.x as any) || 0) || 80);
+                const toY = (Number((target.designer?.position?.y as any) || 0) || 120) + 34;
                 const midX = Math.round((fromX + toX) / 2);
 
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('class', 'fallback-edge-path');
-                path.setAttribute('d', 'M ' + fromX + ' ' + fromY + ' C ' + midX + ' ' + fromY + ', ' + midX + ' ' + toY + ', ' + toX + ' ' + toY);
+                path.setAttribute(
+                    'd',
+                    'M ' + fromX + ' ' + fromY + ' C ' + midX + ' ' + fromY + ', ' + midX + ' ' + toY + ', ' + toX + ' ' + toY
+                );
                 edges.appendChild(path);
             });
 
-            this.steps.forEach((step, idx) => {
+            this.steps.forEach((step: WorkflowStep, idx: number) => {
                 if (!step.nodeId) {
                     step.nodeId = 'fallback-' + (idx + 1);
                 }
                 const node = document.createElement('div');
                 node.className = 'fallback-node' + (String(this.selectedNodeId) === String(step.nodeId) ? ' selected' : '');
-                node.style.left = (Number(step.designer && step.designer.position && step.designer.position.x) || 80) + 'px';
-                node.style.top = (Number(step.designer && step.designer.position && step.designer.position.y) || 120) + 'px';
+                node.style.left = (Number((step.designer?.position?.x as any) || 0) || 80) + 'px';
+                node.style.top = (Number((step.designer?.position?.y as any) || 0) || 120) + 'px';
                 node.innerHTML = this.renderNodeTemplate(step);
-                node.addEventListener('click', (event) => {
+                node.addEventListener('click', (event: MouseEvent) => {
                     event.stopPropagation();
                     this.selectedNodeId = String(step.nodeId);
                     this.refreshSelectedStepView();
@@ -211,7 +339,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             }
         },
 
-        isInsideCanvas(clientX, clientY) {
+        isInsideCanvas(this: any, clientX: number, clientY: number): boolean {
             const canvas = this.canvasElement || document.getElementById('drawflowCanvas');
             if (!canvas) {
                 return false;
@@ -220,8 +348,10 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
         },
 
-        updateCanvasPointerDropHint(clientX, clientY) {
-            const canvasCard = this.canvasCardElement || (this.canvasElement ? this.canvasElement.closest('.canvas-card') : null);
+        updateCanvasPointerDropHint(this: any, clientX: number, clientY: number): void {
+            const canvasCard =
+                this.canvasCardElement ||
+                (this.canvasElement ? this.canvasElement.closest('.canvas-card') : null);
             if (!canvasCard) {
                 return;
             }
@@ -233,7 +363,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             }
         },
 
-        startPointerPaletteDrag(type, event) {
+        startPointerPaletteDrag(this: any, type: string, event: PointerEvent): void {
             const startX = Number(event.clientX) || 0;
             const startY = Number(event.clientY) || 0;
             this.pointerDragState = {
@@ -247,7 +377,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 pointerId: event.pointerId
             };
 
-            const onPointerMove = (moveEvent) => {
+            const onPointerMove = (moveEvent: PointerEvent) => {
                 if (!this.pointerDragState) {
                     return;
                 }
@@ -261,7 +391,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 if (!this.pointerDragState.dragging) {
                     const dx = this.pointerDragState.clientX - this.pointerDragState.startX;
                     const dy = this.pointerDragState.clientY - this.pointerDragState.startY;
-                    if ((Math.abs(dx) + Math.abs(dy)) < 6) {
+                    if (Math.abs(dx) + Math.abs(dy) < 6) {
                         return;
                     }
                     this.pointerDragState.dragging = true;
@@ -274,33 +404,33 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 moveEvent.preventDefault();
             };
 
-            const onPointerUp = (upEvent) => {
-                if (typeof this.pointerDragState.pointerId === 'number' && upEvent.pointerId !== this.pointerDragState.pointerId) {
+            const onPointerUp = (upEvent: PointerEvent) => {
+                if (typeof this.pointerDragState?.pointerId === 'number' && upEvent.pointerId !== this.pointerDragState.pointerId) {
                     return;
                 }
                 this.finishPointerPaletteDrag(false);
             };
 
-            const onKeyDown = (keyEvent) => {
+            const onKeyDown = (keyEvent: KeyboardEvent) => {
                 if (keyEvent.key === 'Escape') {
                     this.finishPointerPaletteDrag(true);
                 }
             };
 
             this.pointerDragState.cleanup = () => {
-                document.removeEventListener('pointermove', onPointerMove);
-                document.removeEventListener('pointerup', onPointerUp);
-                document.removeEventListener('pointercancel', onPointerUp);
+                document.removeEventListener('pointermove', onPointerMove as EventListener);
+                document.removeEventListener('pointerup', onPointerUp as EventListener);
+                document.removeEventListener('pointercancel', onPointerUp as EventListener);
                 document.removeEventListener('keydown', onKeyDown);
             };
 
-            document.addEventListener('pointermove', onPointerMove);
-            document.addEventListener('pointerup', onPointerUp);
-            document.addEventListener('pointercancel', onPointerUp);
+            document.addEventListener('pointermove', onPointerMove as EventListener);
+            document.addEventListener('pointerup', onPointerUp as EventListener);
+            document.addEventListener('pointercancel', onPointerUp as EventListener);
             document.addEventListener('keydown', onKeyDown);
         },
 
-        finishPointerPaletteDrag(cancelled) {
+        finishPointerPaletteDrag(this: any, cancelled: boolean): void {
             const state = this.pointerDragState;
             if (!state) {
                 return;
@@ -330,17 +460,20 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             this.armedPaletteType = null;
         },
 
-        createPointerDragGhost(type) {
+        createPointerDragGhost(this: any, type: string): HTMLElement {
             const ghost = document.createElement('div');
             ghost.className = 'palette-drag-ghost';
             const descriptor = this.getStepTypeDescriptor(type);
-            const label = descriptor && descriptor.displayName ? descriptor.displayName : (type.charAt(0).toUpperCase() + type.slice(1) + ' step');
+            const label =
+                descriptor && descriptor.displayName
+                    ? descriptor.displayName
+                    : type.charAt(0).toUpperCase() + type.slice(1) + ' step';
             ghost.textContent = label;
             document.body.appendChild(ghost);
             return ghost;
         },
 
-        updatePointerDragGhost(clientX, clientY) {
+        updatePointerDragGhost(this: any, clientX: number, clientY: number): void {
             if (!this.pointerDragState || !this.pointerDragState.ghost) {
                 return;
             }
@@ -348,7 +481,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             this.pointerDragState.ghost.style.top = Math.round(clientY + 14) + 'px';
         },
 
-        renderGraphFromSteps() {
+        renderGraphFromSteps(this: any): void {
             if (this.useFallbackCanvas) {
                 this.renderFallbackCanvas();
                 return;
@@ -358,19 +491,20 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 return;
             }
 
-            const previousSelectedStep = this.steps.find((step) => String(step.nodeId) === String(this.selectedNodeId)) || null;
+            const previousSelectedStep =
+                this.steps.find((step: WorkflowStep) => String(step.nodeId) === String(this.selectedNodeId)) || null;
             const previousSelectedStepId = previousSelectedStep ? previousSelectedStep.id : null;
 
             this.isHydratingGraph = true;
-            const idsByStepId = {};
-            this.steps.forEach((step, idx) => {
+            const idsByStepId: Record<string, string> = {};
+            this.steps.forEach((step: WorkflowStep, idx: number) => {
                 const normalized = this.normalizeStep(step, idx + 1);
                 const nodeId = this.editor.addNode(
                     'workflow',
                     1,
                     this.getWorkflowOutputCount(normalized),
-                    normalized.ui.designer.position.x,
-                    normalized.ui.designer.position.y,
+                    normalized.ui?.designer?.position?.x || 0,
+                    normalized.ui?.designer?.position?.y || 0,
                     this.getWorkflowNodeClass(normalized),
                     {
                         stepId: normalized.id,
@@ -380,18 +514,18 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                     this.renderNodeTemplate(normalized)
                 );
                 step.nodeId = this.normalizeNodeId(nodeId);
-                step.designer = normalized.ui.designer;
-                idsByStepId[step.id] = String(step.nodeId);
+                step.designer = normalized.ui?.designer;
+                idsByStepId[step.id || ''] = String(step.nodeId);
             });
 
-            this.steps.forEach((step) => {
-                const fromNode = idsByStepId[step.id];
+            this.steps.forEach((step: WorkflowStep) => {
+                const fromNode = idsByStepId[step.id || ''];
                 if (!fromNode) {
                     return;
                 }
 
                 const targets = this.getWorkflowTransitionTargets(step);
-                Object.keys(targets).forEach((outputKey) => {
+                Object.keys(targets).forEach((outputKey: string) => {
                     const targetStepId = targets[outputKey];
                     const toNode = idsByStepId[targetStepId];
                     if (targetStepId && toNode) {
@@ -402,8 +536,12 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             this.isHydratingGraph = false;
 
             if (previousSelectedStepId) {
-                const restoredSelection = this.steps.find((step) => String(step.id) === String(previousSelectedStepId));
-                this.selectedNodeId = restoredSelection ? String(restoredSelection.nodeId) : (this.steps[0] ? String(this.steps[0].nodeId) : null);
+                const restoredSelection = this.steps.find((step: WorkflowStep) => String(step.id) === String(previousSelectedStepId));
+                this.selectedNodeId = restoredSelection
+                    ? String(restoredSelection.nodeId)
+                    : this.steps[0]
+                    ? String(this.steps[0].nodeId)
+                    : null;
             } else if (this.steps[0]) {
                 this.selectedNodeId = String(this.steps[0].nodeId);
             } else {
@@ -412,14 +550,17 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             this.refreshSelectedStepView();
         },
 
-        addNodeFromPalette(type, dropPosition) {
+        addNodeFromPalette(this: any, type: string, dropPosition?: DropPosition): void {
             if (this.useFallbackCanvas) {
                 const idx = this.steps.length + 1;
                 const step = this.normalizeStep({ type: type }, idx);
                 const descriptor = this.getStepTypeDescriptor(type);
-                step.title = descriptor && descriptor.displayName ? descriptor.displayName : (type.charAt(0).toUpperCase() + type.slice(1) + ' step');
+                step.title =
+                    descriptor && descriptor.displayName
+                        ? descriptor.displayName
+                        : type.charAt(0).toUpperCase() + type.slice(1) + ' step';
                 step.nodeId = 'fallback-' + idx;
-                if (dropPosition) {
+                if (dropPosition && step.ui?.designer?.position) {
                     step.ui.designer.position = dropPosition;
                 }
                 this.steps.push(step);
@@ -445,8 +586,11 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             const idx = this.steps.length + 1;
             const step = this.normalizeStep({ type: type }, idx);
             const descriptor = this.getStepTypeDescriptor(type);
-            step.title = descriptor && descriptor.displayName ? descriptor.displayName : (type.charAt(0).toUpperCase() + type.slice(1) + ' step');
-            if (dropPosition) {
+            step.title =
+                descriptor && descriptor.displayName
+                    ? descriptor.displayName
+                    : type.charAt(0).toUpperCase() + type.slice(1) + ' step';
+            if (dropPosition && step.ui?.designer?.position) {
                 step.ui.designer.position = dropPosition;
             }
 
@@ -454,8 +598,8 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 'workflow',
                 1,
                 this.getWorkflowOutputCount(step),
-                step.ui.designer.position.x,
-                step.ui.designer.position.y,
+                step.ui?.designer?.position?.x || 0,
+                step.ui?.designer?.position?.y || 0,
                 this.getWorkflowNodeClass(step),
                 {
                     stepId: step.id,
@@ -473,15 +617,15 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             this.generate();
         },
 
-        getGraphNode(nodeId) {
-            if (!this.editor || !this.editor.drawflow || !this.editor.drawflow.drawflow || !this.editor.drawflow.drawflow.Home) {
+        getGraphNode(this: any, nodeId: string | number): GraphNode | null {
+            if (!this.editor?.drawflow?.drawflow?.Home) {
                 return null;
             }
             return this.editor.drawflow.drawflow.Home.data[this.normalizeNodeId(nodeId)] || null;
         },
 
-        getGraphNodeByStepId(stepId) {
-            if (!this.editor || !this.editor.drawflow || !this.editor.drawflow.drawflow || !this.editor.drawflow.drawflow.Home) {
+        getGraphNodeByStepId(this: any, stepId: string): GraphNode | null {
+            if (!this.editor?.drawflow?.drawflow?.Home) {
                 return null;
             }
 
@@ -490,38 +634,43 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 return null;
             }
 
-            return Object.values(this.editor.drawflow.drawflow.Home.data).find((graphNode) => {
-                return graphNode && graphNode.data && String(graphNode.data.stepId || '').trim() === normalizedStepId;
-            }) || null;
+            const nodes = Object.values(this.editor.drawflow.drawflow.Home.data) as any[];
+            return (
+                nodes.find((graphNode: any) => {
+                    return graphNode && graphNode.data && String(graphNode.data.stepId || '').trim() === normalizedStepId;
+                }) || null
+            );
         },
 
-        getWorkflowNodeClass(step) {
-            const type = String(step && step.type ? step.type : 'form').trim() || 'form';
+        getWorkflowNodeClass(this: any, step: WorkflowStep): string {
+            const type = String((step && step.type) || 'form').trim() || 'form';
             return 'workflow-node workflow-node--' + type;
         },
 
-        getWorkflowOutputCount(step) {
-            const type = String(step && step.type ? step.type : 'form').trim();
+        getWorkflowOutputCount(this: any, step: WorkflowStep): number {
+            const type = String((step && step.type) || 'form').trim();
             return this.getStepTypeOutputCount(type);
         },
 
-        getWorkflowTransitionTargets(step) {
-            const stepType = String(step && step.type ? step.type : 'form');
+        getWorkflowTransitionTargets(this: any, step: WorkflowStep): Record<string, string> {
+            const stepType = String((step && step.type) || 'form');
             const outputCount = this.getStepTypeOutputCount(stepType);
-            const routing = step && step.routing && typeof step.routing === 'object' && !Array.isArray(step.routing)
-                ? step.routing
-                : {};
-            const transitions = routing.transitions && typeof routing.transitions === 'object' && !Array.isArray(routing.transitions)
-                ? routing.transitions
-                : {};
+            const routing: any =
+                step && step.routing && typeof step.routing === 'object' && !Array.isArray(step.routing)
+                    ? step.routing
+                    : {};
+            const transitions: Record<string, any> =
+                routing.transitions && typeof routing.transitions === 'object' && !Array.isArray(routing.transitions)
+                    ? routing.transitions
+                    : {};
 
             const values = Object.keys(transitions)
                 .sort()
-                .map((key) => String(transitions[key] || '').trim())
+                .map((key: string) => String(transitions[key] || '').trim())
                 .filter(Boolean);
 
             if (outputCount > 1) {
-                const outputTransitions = {};
+                const outputTransitions: Record<string, string> = {};
                 for (let outputIndex = 1; outputIndex <= outputCount; outputIndex += 1) {
                     outputTransitions['output_' + outputIndex] = values[outputIndex - 1] || '';
                 }
@@ -533,7 +682,7 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             };
         },
 
-        enforceSingleConnectionPerOutput(connection) {
+        enforceSingleConnectionPerOutput(this: any, connection: GraphConnection): void {
             if (!connection || !this.editor) {
                 return;
             }
@@ -553,9 +702,9 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 return;
             }
 
-            connections.forEach((existingConnection) => {
+            connections.forEach((existingConnection: any) => {
                 const existingInputNodeId = this.normalizeNodeId(existingConnection && existingConnection.node);
-                const existingInputClass = String(existingConnection && existingConnection.output || '').trim();
+                const existingInputClass = String((existingConnection && existingConnection.output) || '').trim();
                 const isNewConnection = existingInputNodeId === inputNodeId && existingInputClass === inputClass;
                 if (isNewConnection) {
                     return;
@@ -565,16 +714,17 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
             });
         },
 
-        syncTransitionsFromGraph() {
-            this.steps.forEach((step) => {
+        syncTransitionsFromGraph(this: any): void {
+            this.steps.forEach((step: WorkflowStep) => {
                 if (!step.routing || typeof step.routing !== 'object') {
-                    step.routing = {};
+                    step.routing = { transitions: {} };
+                } else {
+                    step.routing.transitions = {};
                 }
-                step.routing.transitions = {};
             });
 
-            this.steps.forEach((step) => {
-                const graphNode = this.getGraphNode(step.nodeId) || this.getGraphNodeByStepId(step.id);
+            this.steps.forEach((step: WorkflowStep) => {
+                const graphNode = this.getGraphNode(step.nodeId) || this.getGraphNodeByStepId(step.id || '');
                 if (!graphNode || !graphNode.outputs) {
                     return;
                 }
@@ -582,8 +732,8 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 const outputCount = this.getWorkflowOutputCount(step);
                 const outputKeys = outputCount > 1 ? Object.keys(graphNode.outputs) : ['output_1'];
 
-                outputKeys.forEach((outputKey, idx) => {
-                    const firstConnection = graphNode.outputs[outputKey]
+                outputKeys.forEach((outputKey: string, idx: number) => {
+                    const firstConnection = graphNode.outputs?.[outputKey]
                         ? (graphNode.outputs[outputKey].connections || [])[0]
                         : null;
                     if (!firstConnection) {
@@ -596,28 +746,36 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                         return;
                     }
 
-                    const transitionKey = outputCount > 1
-                        ? outputKey
-                        : (String(step.type || '').trim() === 'form' ? 'onSubmit' : 'default');
+                    const transitionKey =
+                        outputCount > 1 ? outputKey : String(step.type || '').trim() === 'form' ? 'onSubmit' : 'default';
 
-                    step.routing.transitions[transitionKey] = nextStepId;
+                    if (step.routing) {
+                        step.routing.transitions[transitionKey] = nextStepId;
+                    }
                 });
             });
         },
 
-        renderNodeTemplate(step) {
+        renderNodeTemplate(this: any, step: WorkflowStep): string {
             const safeId = this.escapeHtml(step.id || 'step');
             const safeTitle = this.escapeHtml(step.title || 'Untitled step');
             const safeType = this.escapeHtml(step.type || 'form');
-            return '' +
+            return (
                 '<div class="node-shell">' +
-                '<div class="node-type">' + safeType + '</div>' +
-                '<div class="node-title">' + safeTitle + '</div>' +
-                '<div class="node-id">' + safeId + '</div>' +
-                '</div>';
+                '<div class="node-type">' +
+                safeType +
+                '</div>' +
+                '<div class="node-title">' +
+                safeTitle +
+                '</div>' +
+                '<div class="node-id">' +
+                safeId +
+                '</div>' +
+                '</div>'
+            );
         },
 
-        escapeHtml(value) {
+        escapeHtml(this: any, value: unknown): string {
             return String(value)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
@@ -626,14 +784,16 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                 .replace(/'/g, '&#39;');
         },
 
-        generate() {
-            const normalizedSteps = this.steps.map((step, idx) => this.normalizeStep(step, idx + 1));
-    
-            const payload = {
+        generate(this: any): void {
+            const normalizedSteps = this.steps.map((step: WorkflowStep, idx: number) => this.normalizeStep(step, idx + 1));
+
+            const payload: WorkflowPayload = {
                 kind: 'workflow',
                 id: this.definitionKey,
-                steps: this.steps.map((step) => {
-                    const cleanedStep = {
+                title: this.workflowTitle || '',
+
+                steps: this.steps.map((step: WorkflowStep) => {
+                    const cleanedStep: any = {
                         id: String(step.id || '').trim(),
                         title: String(step.title || '').trim(),
                         type: String(step.type || '').trim(),
@@ -641,13 +801,14 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
                     };
 
                     // Copy all other properties generically
-                    Object.keys(step).forEach((key) => {
+                    Object.keys(step).forEach((key: string) => {
                         if (['id', 'title', 'type', 'routing', 'nodeId', 'designer'].includes(key)) {
                             return;
                         }
-                        cleanedStep[key] = typeof step[key] === 'object' && step[key] !== null
-                            ? JSON.parse(JSON.stringify(step[key]))
-                            : step[key];
+                        cleanedStep[key] =
+                            typeof step[key as keyof WorkflowStep] === 'object' && step[key as keyof WorkflowStep] !== null
+                                ? JSON.parse(JSON.stringify(step[key as keyof WorkflowStep]))
+                                : step[key as keyof WorkflowStep];
                     });
 
                     if (step.ui && typeof step.ui === 'object') {
@@ -660,5 +821,5 @@ window.workflowDesignerCanvasMixin = function workflowDesignerCanvasMixin(target
 
             this.definitionJson = JSON.stringify(payload, null, 2);
         }
-    });
+    } as WorkflowDesignerCanvasApi);
 };

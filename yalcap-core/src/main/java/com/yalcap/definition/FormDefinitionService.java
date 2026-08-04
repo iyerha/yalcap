@@ -16,6 +16,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.i18n.LocaleContextHolder;
 
 import tools.jackson.databind.JsonNode;
@@ -37,15 +38,18 @@ public class FormDefinitionService {
     private final FormDefinitionRepository formDefinitionRepository;
     private final ControlTypeRegistry controlTypeRegistry;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public FormDefinitionService(DefinitionFilesystem definitionFilesystem,
                                 FormDefinitionRepository formDefinitionRepository,
                                 ControlTypeRegistry controlTypeRegistry,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                ApplicationEventPublisher eventPublisher) {
         this.definitionFilesystem = definitionFilesystem;
         this.formDefinitionRepository = formDefinitionRepository;
         this.controlTypeRegistry = controlTypeRegistry;
         this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     public FormDefinition getFormDefinition(String formKey) {
@@ -68,6 +72,11 @@ public class FormDefinitionService {
         
         // Validate binding between HTML and dataSchema
         validateBinding(htmlControlSchema, dataSchemaNode);
+
+        String title = extractTitle(htmlControlSchema);
+        if (title.isEmpty()) {
+            title = formKey;
+        }
         
         // Write both to filesystem
         definitionFilesystem.writeFormControlSchema(formKey, htmlControlSchema);
@@ -82,11 +91,39 @@ public class FormDefinitionService {
             formDefinitionRepository.save(entity);
         });
         
-        FormDefinitionEntity published = new FormDefinitionEntity(
-                null, formKey, htmlControlSchema, dataSchemaNode, nextVersion, true, 
-                TenantContext.getTenantId().orElse(UUID.fromString("00000000-0000-0000-0000-000000000000")),
-                createdBy, changeMessage);
-        return formDefinitionRepository.save(published);
+    FormDefinitionEntity published = new FormDefinitionEntity(
+            null, formKey, title, htmlControlSchema, dataSchemaNode, nextVersion, true, 
+            TenantContext.getTenantId().orElse(UUID.fromString("00000000-0000-0000-0000-000000000000")),
+            createdBy, changeMessage);
+    published = formDefinitionRepository.save(published);
+    
+    // Publish event for indexing
+    var event = new FormDefinitionPublishedEvent(
+        published.getId().toString(),
+        formKey,
+        title,
+        nextVersion,
+        TenantContext.requireTenantId().toString(),
+        createdBy,
+        changeMessage
+    );
+    eventPublisher.publishEvent(event);
+    
+    return published;
+    }
+
+    private String extractTitle(String htmlContent) {
+        Document doc = Jsoup.parse(htmlContent);
+        
+        // Try to extract from data-title attribute first
+        Element form = doc.selectFirst("form[data-title]");
+        if (form != null) {
+            String title = form.attr("data-title");
+            if (!title.isEmpty()) {
+                return title;
+            }
+        }
+        return "";
     }
 
     private JsonNode parseYamlToJson(String yaml) throws IOException {

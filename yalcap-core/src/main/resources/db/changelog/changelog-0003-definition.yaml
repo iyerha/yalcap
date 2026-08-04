@@ -16,6 +16,9 @@ databaseChangeLog:
                   name: definition_key
                   type: varchar(200)
               - column:
+                  name: title
+                  type: varchar(255)
+              - column:
                   name: version_number
                   type: integer
               - column:
@@ -68,6 +71,9 @@ databaseChangeLog:
               - column:
                   name: form_key
                   type: varchar(200)
+              - column:
+                  name: title
+                  type: varchar(255)
               - column:
                   name: version_number
                   type: integer

@@ -1,9 +1,35 @@
-// @ts-check
 (function () {
-    const windowAny = /** @type {any} */ (window);
+    const windowAny = window as any;
 
-    const resizeInteractionsApi = /** @type {Record<string, any>} */ ({
-        startResize(controlId, event) {
+    interface ResizeInteractionsApi {
+        resizingControlId: string | null;
+        resizeStartX: number;
+        resizeStartSpan: number;
+        resizeGridElement: Element | null;
+        resizeMoveHandler: ((event: MouseEvent) => void) | null;
+        resizeUpHandler: (() => void) | null;
+        resizeCancelHandler: (() => void) | null;
+        resizeKeyHandler: ((event: KeyboardEvent) => void) | null;
+        resizeVisibilityHandler: (() => void) | null;
+        $root?: any;
+        startResize(controlId: string, event: MouseEvent): void;
+        onResizeMove(event: MouseEvent): void;
+        stopResize(): void;
+        [key: string]: any;
+    }
+
+    const resizeInteractionsApi: ResizeInteractionsApi = {
+        resizingControlId: null,
+        resizeStartX: 0,
+        resizeStartSpan: 0,
+        resizeGridElement: null,
+        resizeMoveHandler: null,
+        resizeUpHandler: null,
+        resizeCancelHandler: null,
+        resizeKeyHandler: null,
+        resizeVisibilityHandler: null,
+
+        startResize(controlId: string, event: MouseEvent): void {
             const found = this.findControlByLocalId(controlId);
             if (!found) {
                 return;
@@ -18,14 +44,14 @@
             this.resizingControlId = controlId;
             this.resizeStartX = event.clientX;
             this.resizeStartSpan = Number(found.control.colSpan) || 12;
-            this.resizeGridElement = event && event.target && event.target.closest
-                ? event.target.closest('.canvas, .nested-grid')
+            this.resizeGridElement = event && event.target && (event.target as Element).closest
+                ? (event.target as Element).closest('.canvas, .nested-grid')
                 : null;
 
-            this.resizeMoveHandler = (moveEvent) => this.onResizeMove(moveEvent);
+            this.resizeMoveHandler = (moveEvent: MouseEvent) => this.onResizeMove(moveEvent);
             this.resizeUpHandler = () => this.stopResize();
             this.resizeCancelHandler = () => this.stopResize();
-            this.resizeKeyHandler = (keyEvent) => {
+            this.resizeKeyHandler = (keyEvent: KeyboardEvent) => {
                 if (keyEvent.key === 'Escape') {
                     this.stopResize();
                 }
@@ -36,15 +62,15 @@
                 }
             };
 
-            window.addEventListener('mousemove', this.resizeMoveHandler, true);
-            window.addEventListener('mouseup', this.resizeUpHandler, true);
-            window.addEventListener('blur', this.resizeCancelHandler);
-            window.addEventListener('keydown', this.resizeKeyHandler, true);
+            window.addEventListener('mousemove', this.resizeMoveHandler as EventListener, true);
+            window.addEventListener('mouseup', this.resizeUpHandler as EventListener, true);
+            window.addEventListener('blur', this.resizeCancelHandler as EventListener);
+            window.addEventListener('keydown', this.resizeKeyHandler as EventListener, true);
             document.addEventListener('visibilitychange', this.resizeVisibilityHandler);
             document.body.classList.add('is-resizing');
         },
 
-        onResizeMove(event) {
+        onResizeMove(event: MouseEvent): void {
             if (!this.resizingControlId) {
                 return;
             }
@@ -59,7 +85,7 @@
                 return;
             }
 
-            const colWidth = gridElement.clientWidth / 12;
+            const colWidth = (gridElement as HTMLElement).clientWidth / 12;
             if (!colWidth || Number.isNaN(colWidth)) {
                 return;
             }
@@ -74,23 +100,23 @@
                 nextSpan = 12;
             }
 
-            this.updateCanvasControl(this.resizingControlId, (control) => {
+            this.updateCanvasControl(this.resizingControlId, (control: any) => {
                 control.colSpan = nextSpan;
             });
         },
 
-        stopResize() {
+        stopResize(): void {
             if (this.resizeMoveHandler) {
-                window.removeEventListener('mousemove', this.resizeMoveHandler, true);
+                window.removeEventListener('mousemove', this.resizeMoveHandler as EventListener, true);
             }
             if (this.resizeUpHandler) {
-                window.removeEventListener('mouseup', this.resizeUpHandler, true);
+                window.removeEventListener('mouseup', this.resizeUpHandler as EventListener, true);
             }
             if (this.resizeCancelHandler) {
-                window.removeEventListener('blur', this.resizeCancelHandler);
+                window.removeEventListener('blur', this.resizeCancelHandler as EventListener);
             }
             if (this.resizeKeyHandler) {
-                window.removeEventListener('keydown', this.resizeKeyHandler, true);
+                window.removeEventListener('keydown', this.resizeKeyHandler as EventListener, true);
             }
             if (this.resizeVisibilityHandler) {
                 document.removeEventListener('visibilitychange', this.resizeVisibilityHandler);
@@ -105,7 +131,7 @@
             this.resizeVisibilityHandler = null;
             document.body.classList.remove('is-resizing');
         }
-    });
+    };
 
     windowAny.formDesignerInteractionsResize = resizeInteractionsApi;
 })();

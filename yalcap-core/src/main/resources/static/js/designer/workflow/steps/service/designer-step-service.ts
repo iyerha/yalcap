@@ -1,11 +1,35 @@
-(function registerServiceStepHook() {
-    var register = window.registerWorkflowStepHook;
+// @ts-check
+
+interface ServiceConfig {
+    serviceRef?: string;
+    [key: string]: unknown;
+}
+
+interface ServiceStepContext {
+    draft?: {
+        config?: ServiceConfig;
+        [key: string]: unknown;
+    };
+    step?: {
+        config?: ServiceConfig;
+        [key: string]: unknown;
+    };
+    setHint?: (hint: string) => void;
+}
+
+interface ServiceStepHook {
+    onSelect: (context: ServiceStepContext) => void;
+    afterSync: (context: ServiceStepContext) => void;
+}
+
+(function registerServiceStepHook(): void {
+    const register = (window as any).registerWorkflowStepHook;
     if (typeof register !== 'function') {
         return;
     }
 
-    function evaluateServiceRef(rawValue) {
-        var value = String(rawValue || '').trim();
+    function evaluateServiceRef(rawValue: unknown): string {
+        const value = String(rawValue || '').trim();
         if (!value) {
             return 'Service step: set serviceRef to a stable handler id or bean reference.';
         }
@@ -22,22 +46,22 @@
     }
 
     register('service', {
-        onSelect: function onSelect(context) {
+        onSelect(context: ServiceStepContext): void {
             if (!context || !context.draft) {
                 return;
             }
 
-            var draft = context.draft;
+            const draft = context.draft;
             if (!draft.config || typeof draft.config !== 'object') {
                 draft.config = {};
             }
 
             if (typeof context.setHint === 'function') {
-                context.setHint(evaluateServiceRef(draft.config.serviceRef));
+                context.setHint(evaluateServiceRef(draft.config!.serviceRef));
             }
         },
 
-        afterSync: function afterSync(context) {
+        afterSync(context: ServiceStepContext): void {
             if (!context || !context.step || !context.step.config) {
                 return;
             }
@@ -46,5 +70,5 @@
                 context.setHint(evaluateServiceRef(context.step.config.serviceRef));
             }
         }
-    });
+    } as ServiceStepHook);
 })();

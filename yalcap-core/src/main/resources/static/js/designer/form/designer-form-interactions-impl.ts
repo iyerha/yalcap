@@ -1,6 +1,5 @@
-// @ts-check
 (function () {
-    const windowAny = /** @type {any} */ (window);
+    const windowAny = window as any;
 
     windowAny.formDesignerInteractionsImpl = {
         ...(windowAny.formDesignerInteractionsCore || {}),

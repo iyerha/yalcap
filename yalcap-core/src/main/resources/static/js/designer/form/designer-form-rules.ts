@@ -1,6 +1,9 @@
-// @ts-check
-(function initFormDesignerRules(windowAny) {
-    const host = /** @type {any} */ (windowAny);
+interface RulesApi {
+    [key: string]: any;
+}
+
+(function initFormDesignerRules(windowAny: Window & typeof globalThis): void {
+    const host = windowAny as any;
     const tableApi = host.formDesignerRulesTable || {};
     const utilsApi = host.formDesignerRulesUtils || {};
     const compileApi = host.formDesignerRulesCompile || {};
@@ -10,4 +13,4 @@
         ...utilsApi,
         ...compileApi
     };
-}(window));
+})(window);

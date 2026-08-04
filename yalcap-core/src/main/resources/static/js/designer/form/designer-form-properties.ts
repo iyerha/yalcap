@@ -1,13 +1,37 @@
-// @ts-check
 (function () {
-    const windowAny = /** @type {any} */ (window);
+    const windowAny = window as any;
 
-    const propertiesApi = /** @type {Record<string, any>} */ ({
-        toggleStateKeyEdit() {
+    interface PropertiesApi {
+        selectedControl: any;
+        selectedControlLocalId: string | null;
+        validationErrors: string[];
+        toggleStateKeyEdit(): void;
+        onLabelChanged(): void;
+        onNameChanged(): void;
+        onWidgetChanged(): void;
+        onTypeChanged(): void;
+        addOptionRow(): void;
+        removeOptionRow(index: number): void;
+        addTableColumn(): void;
+        removeTableColumn(index: number): void;
+        onTableColumnKeyChanged(index: number): void;
+        onOptionLabelChanged(index: number): void;
+        onOptionValueChanged(index: number): void;
+        syncSelected(): void;
+        validateSelected(): void;
+        [key: string]: any;
+    }
+
+    const propertiesApi: PropertiesApi = {
+        selectedControl: null,
+        selectedControlLocalId: null,
+        validationErrors: [],
+
+        toggleStateKeyEdit(): void {
             this.stateKeyEditEnabled = false;
         },
 
-        onLabelChanged() {
+        onLabelChanged(): void {
             if (!this.selectedControl) {
                 return;
             }
@@ -19,7 +43,7 @@
             this.syncSelected();
         },
 
-        onNameChanged() {
+        onNameChanged(): void {
             if (!this.selectedControl) {
                 return;
             }
@@ -29,7 +53,7 @@
             this.syncSelected();
         },
 
-        onWidgetChanged() {
+        onWidgetChanged(): void {
             if (!this.selectedControl) {
                 return;
             }
@@ -37,7 +61,7 @@
             this.syncSelected();
         },
 
-        onTypeChanged() {
+        onTypeChanged(): void {
             if (!this.selectedControl) {
                 return;
             }
@@ -84,7 +108,7 @@
             this.syncSelected();
         },
 
-        addOptionRow() {
+        addOptionRow(): void {
             if (!this.selectedControl || !this.isOptionWidget(this.selectedControl.widget)) {
                 return;
             }
@@ -98,7 +122,7 @@
             this.syncSelected();
         },
 
-        removeOptionRow(index) {
+        removeOptionRow(index: number): void {
             if (!this.selectedControl || !Array.isArray(this.selectedControl.options)) {
                 return;
             }
@@ -106,7 +130,7 @@
             this.syncSelected();
         },
 
-        addTableColumn() {
+        addTableColumn(): void {
             if (!this.selectedControl || this.selectedControl.widget !== 'table') {
                 return;
             }
@@ -123,7 +147,7 @@
             this.syncSelected();
         },
 
-        removeTableColumn(index) {
+        removeTableColumn(index: number): void {
             if (!this.selectedControl || this.selectedControl.widget !== 'table' || !Array.isArray(this.selectedControl.tableColumns)) {
                 return;
             }
@@ -131,7 +155,7 @@
             this.syncSelected();
         },
 
-        onTableColumnKeyChanged(index) {
+        onTableColumnKeyChanged(index: number): void {
             if (!this.selectedControl || this.selectedControl.widget !== 'table' || !Array.isArray(this.selectedControl.tableColumns)) {
                 return;
             }
@@ -143,7 +167,7 @@
             this.syncSelected();
         },
 
-        onOptionLabelChanged(index) {
+        onOptionLabelChanged(index: number): void {
             if (!this.selectedControl || !Array.isArray(this.selectedControl.options)) {
                 return;
             }
@@ -157,7 +181,7 @@
             this.syncSelected();
         },
 
-        onOptionValueChanged(index) {
+        onOptionValueChanged(index: number): void {
             if (!this.selectedControl || !Array.isArray(this.selectedControl.options)) {
                 return;
             }
@@ -169,7 +193,7 @@
             this.syncSelected();
         },
 
-        syncSelected() {
+        syncSelected(): void {
             if (!this.selectedControl) {
                 return;
             }
@@ -196,10 +220,10 @@
             this.validateSelected();
         },
 
-        validateSelected() {
+        validateSelected(): void {
             this.validationErrors = this.selectedControl ? this.validateControl(this.selectedControl) : [];
         }
-    });
+    };
 
     windowAny.formDesignerProperties = propertiesApi;
 })();

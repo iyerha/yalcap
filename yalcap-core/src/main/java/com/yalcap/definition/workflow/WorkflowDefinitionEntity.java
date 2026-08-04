@@ -21,6 +21,9 @@ public class WorkflowDefinitionEntity implements TenantAware, IdAware {
     @Column("definition_key")
     private String definitionKey;
 
+    @Column("title")
+    private String title;
+
     @Column("definition")
     private JsonNode definition;
 
@@ -45,6 +48,7 @@ public class WorkflowDefinitionEntity implements TenantAware, IdAware {
 
     public WorkflowDefinitionEntity(UUID id,
                                   String definitionKey,
+                                  String title,
                                   JsonNode definition,
                                   Integer versionNumber,
                                   Boolean active,
@@ -53,6 +57,7 @@ public class WorkflowDefinitionEntity implements TenantAware, IdAware {
                                   String changeMessage) {
         this.id = id;
         this.definitionKey = definitionKey;
+        this.title = title;
         this.definition = definition;
         this.versionNumber = versionNumber;
         this.active = active;
@@ -75,6 +80,14 @@ public class WorkflowDefinitionEntity implements TenantAware, IdAware {
 
     public void setDefinitionKey(String definitionKey) {
         this.definitionKey = definitionKey;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     public JsonNode getDefinition() {

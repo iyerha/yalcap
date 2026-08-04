@@ -1,18 +1,16 @@
 // @ts-check
-(function registerRepeatDesignerHooks(windowAny) {
-    const host = /** @type {any} */ (windowAny);
+(function registerRepeatDesignerHooks(windowAny: any) {
+    const host = windowAny as any;
     if (!host.designerControlHooks || typeof host.designerControlHooks !== 'object') {
         host.designerControlHooks = {};
     }
 
-    /** @type {DesignerControlHooksApi} */
-    const hooks = {
+    const hooks: DesignerControlHooksApi = {
         /**
          * Repeat accepts exactly one direct child. That child may be a group or scalar control,
          * but may not be another repeat or section.
-         * @param {DesignerControlHookContext} context
          */
-        canInsertIntoSource(context) {
+        canInsertIntoSource(context: DesignerControlHookContext): boolean {
             const container = context?.container;
             const control = context?.control;
             const controlId = String(context?.controlId || '');
@@ -24,7 +22,7 @@
                 container.children = [];
             }
 
-            const existingChildren = container.children.filter((/** @type {any} */ child) => child && child.localId !== controlId);
+            const existingChildren = container.children.filter((child: any) => child && child.localId !== controlId);
             if (existingChildren.length >= 1) {
                 return false;
             }
@@ -35,8 +33,7 @@
 
     host.designerControlHooks.repeat = hooks;
 
-    /** @param {DesignerControl | undefined} control */
-    function isValidRepeatChild(control) {
+    function isValidRepeatChild(control: DesignerControl | undefined): boolean {
         if (!control) {
             return false;
         }

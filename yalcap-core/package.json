@@ -1,0 +1,12 @@
+{
+  "name": "yalcap-core-frontend",
+  "version": "0.0.1",
+  "description": "Frontend build for yalcap-core",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

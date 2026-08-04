@@ -2,6 +2,8 @@ package com.yalcap.definition.form;
 
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.yalcap.definition.FormDefinitionService;
 import com.yalcap.definition.form.control.ControlTypeRegistry;
 import com.yalcap.definition.form.control.internal.AutocompleteControlType;
@@ -41,6 +43,7 @@ class FormDefinitionServiceTest {
 
   private FormDefinitionService service;
   private MockedStatic<TenantContext> mockedTenantContext;
+  private final ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
 
   @BeforeEach
   void setUp() {
@@ -52,7 +55,8 @@ class FormDefinitionServiceTest {
         definitionFilesystem,
         repository,
         controlTypeRegistry,
-        objectMapper);
+        objectMapper,
+        eventPublisher);
   }
 
   @AfterEach

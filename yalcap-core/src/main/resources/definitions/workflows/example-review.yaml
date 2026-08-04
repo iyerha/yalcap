@@ -37,7 +37,7 @@ steps:
     - "requestor"
     users: []
   ui:
-    pointer: "#/control/submit"
+    pointer: "abc"
   routing:
     transitions:
       onSubmit: "review"
@@ -57,7 +57,7 @@ steps:
     - "alice"
     - "bob"
   ui:
-    pointer: "#/control/review"
+    pointer: "abc"
   routing:
     transitions:
       onApprove: "approved"
@@ -75,6 +75,6 @@ steps:
     - "system"
     users: []
   ui:
-    pointer: "#/control/approved"
+    pointer: "abc"
   routing:
     transitions: {}

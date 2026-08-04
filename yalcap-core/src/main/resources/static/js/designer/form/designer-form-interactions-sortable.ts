@@ -1,9 +1,91 @@
-// @ts-check
 (function () {
-    const windowAny = /** @type {any} */ (window);
+    const windowAny = window as any;
 
-    const sortableInteractionsApi = /** @type {Record<string, any>} */ ({
-        initSortable() {
+    interface SortableOptions {
+        group?: any;
+        sort?: boolean;
+        animation?: number;
+        ghostClass?: string;
+        chosenClass?: string;
+        draggable?: string;
+        fallbackTolerance?: number;
+        swapThreshold?: number;
+        invertSwap?: boolean;
+        invertedSwapThreshold?: number;
+        filter?: string;
+        preventOnFilter?: boolean;
+        onClone?: (evt: any) => void;
+        onAdd?: (evt: any) => void;
+        onUpdate?: (evt: any) => void;
+        load?: (query: string, callback: (items: any[]) => void) => void;
+        preload?: boolean | string;
+        create?: boolean;
+        allowEmptyOption?: boolean;
+        maxOptions?: number | null;
+        searchField?: string[];
+        maxItems?: number;
+        onChange?: (value: any) => void;
+    }
+
+    interface SortableInstance {
+        destroy(): void;
+    }
+
+    interface SortableEvent {
+        item: HTMLElement;
+        newIndex?: number;
+        oldIndex?: number;
+        from: HTMLElement;
+        to: HTMLElement;
+        clone?: HTMLElement;
+    }
+
+    interface FlatpickrInstance {
+        destroy(): void;
+    }
+
+    interface TomSelectInstance {
+        destroy(): void;
+    }
+
+    interface SortableInteractionsApi {
+        paletteSortable: SortableInstance | null;
+        canvasSortable: SortableInstance | null;
+        nestedSortables: Map<string, SortableInstance> | null;
+        sortableObserver: MutationObserver | null;
+        sortableCleanupBound: (() => void) | null;
+        flatpickrInstances: Map<HTMLElement, FlatpickrInstance> | null;
+        tomSelectInstances: Map<HTMLElement, TomSelectInstance> | null;
+        $root?: any;
+        $nextTick?: (callback: () => void) => void;
+        initSortable(): void;
+        destroySortable(): void;
+        setupNestedSortables(): void;
+        handleSortableAdd(evt: SortableEvent, targetSourceId: string): void;
+        handleSortableReorder(evt: SortableEvent, sourceId: string): void;
+        getControlListBySource(sourceId: string): any[] | null;
+        insertControlIntoSource(sourceId: string, control: any, index: number): boolean;
+        getControlDesignerHooks(widget: string): any;
+        canInsertIntoSource(sourceId: string, control: any, controlId?: string): boolean;
+        syncSortableDom(): void;
+        preparePaletteClone(evt: any): void;
+        stripAlpineAttrs(root: Element | null): void;
+        initDesignerWidgets(): void;
+        destroyDesignerWidgets(): void;
+        flashInvalidDrop(element: Element | null): void;
+        [key: string]: any;
+    }
+
+    const sortableInteractionsApi: SortableInteractionsApi = {
+        paletteSortable: null,
+        canvasSortable: null,
+        nestedSortables: null,
+        sortableObserver: null,
+        sortableCleanupBound: null,
+        flatpickrInstances: null,
+        tomSelectInstances: null,
+
+        initSortable(): void {
             if (!windowAny.Sortable || !this.$root) {
                 return;
             }
@@ -21,7 +103,7 @@
                     animation: 120,
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
-                    onClone: (/** @type {any} */ evt) => this.preparePaletteClone(evt)
+                    onClone: (evt: any) => this.preparePaletteClone(evt)
                 });
             }
 
@@ -38,8 +120,8 @@
                     invertedSwapThreshold: 0.25,
                     filter: 'input, textarea, select, button, option, label, .remove-control-btn',
                     preventOnFilter: false,
-                    onAdd: (/** @type {any} */ evt) => this.handleSortableAdd(evt, '__root__'),
-                    onUpdate: (/** @type {any} */ evt) => this.handleSortableReorder(evt, '__root__')
+                    onAdd: (evt: any) => this.handleSortableAdd(evt, '__root__'),
+                    onUpdate: (evt: any) => this.handleSortableReorder(evt, '__root__')
                 });
             }
 
@@ -61,7 +143,7 @@
             }
         },
 
-        destroySortable() {
+        destroySortable(): void {
             this.destroyDesignerWidgets();
 
             if (this.paletteSortable && this.paletteSortable.destroy) {
@@ -75,7 +157,7 @@
             this.canvasSortable = null;
 
             if (this.nestedSortables) {
-                this.nestedSortables.forEach((/** @type {any} */ sortable) => {
+                this.nestedSortables.forEach((sortable: SortableInstance) => {
                     if (sortable && sortable.destroy) {
                         sortable.destroy();
                     }
@@ -95,7 +177,7 @@
             }
         },
 
-        setupNestedSortables() {
+        setupNestedSortables(): void {
             if (!windowAny.Sortable || !this.$root) {
                 return;
             }
@@ -104,16 +186,16 @@
                 this.nestedSortables = new Map();
             }
 
-            const seenSources = new Set();
+            const seenSources = new Set<string>();
             const nestedZones = this.$root.querySelectorAll('.nested-dropzone[data-sortable-source]');
-            nestedZones.forEach((/** @type {any} */ zone) => {
-                const sourceId = (zone.dataset.sortableSource || '').trim();
+            nestedZones.forEach((zone: Element) => {
+                const sourceId = (zone.getAttribute('data-sortable-source') || '').trim();
                 if (!sourceId) {
                     return;
                 }
 
                 seenSources.add(sourceId);
-                if (this.nestedSortables.has(sourceId)) {
+                if (this.nestedSortables!.has(sourceId)) {
                     return;
                 }
 
@@ -129,30 +211,29 @@
                     invertedSwapThreshold: 0.25,
                     filter: 'input, textarea, select, button, option, label, .remove-control-btn',
                     preventOnFilter: false,
-                    onAdd: (/** @type {any} */ evt) => this.handleSortableAdd(evt, sourceId),
-                    onUpdate: (/** @type {any} */ evt) => this.handleSortableReorder(evt, sourceId)
+                    onAdd: (evt: any) => this.handleSortableAdd(evt, sourceId),
+                    onUpdate: (evt: any) => this.handleSortableReorder(evt, sourceId)
                 });
 
                 this.nestedSortables.set(sourceId, sortable);
             });
 
-            this.nestedSortables.forEach((/** @type {any} */ sortable, /** @type {string} */ sourceId) => {
+            this.nestedSortables.forEach((sortable: SortableInstance, sourceId: string) => {
                 if (seenSources.has(sourceId)) {
                     return;
                 }
                 sortable.destroy();
-                this.nestedSortables.delete(sourceId);
+                this.nestedSortables!.delete(sourceId);
             });
         },
 
-        /** @param {any} evt @param {string} targetSourceId */
-        handleSortableAdd(evt, targetSourceId) {
+        handleSortableAdd(evt: SortableEvent, targetSourceId: string): void {
             if (!evt || !evt.item) {
                 return;
             }
 
             const rawIndex = Number(evt.newIndex);
-            const paletteIndex = Number(evt.item.dataset.paletteIndex);
+            const paletteIndex = Number((evt.item as any).dataset.paletteIndex);
             if (!Number.isNaN(paletteIndex)) {
                 const created = this.createControlFromPalette(paletteIndex);
                 if (!created) {
@@ -190,7 +271,7 @@
                 return;
             }
 
-            const controlId = (evt.item.dataset.controlId || '').trim();
+            const controlId = ((evt.item as any).dataset.controlId || '').trim();
             if (!controlId) {
                 return;
             }
@@ -229,8 +310,7 @@
             this.syncSortableDom();
         },
 
-        /** @param {any} evt @param {string} sourceId */
-        handleSortableReorder(evt, sourceId) {
+        handleSortableReorder(evt: SortableEvent, sourceId: string): void {
             if (!evt || evt.from !== evt.to) {
                 return;
             }
@@ -255,8 +335,7 @@
             this.clearSelection();
         },
 
-        /** @param {string} sourceId */
-        getControlListBySource(sourceId) {
+        getControlListBySource(sourceId: string): any[] | null {
             if (sourceId === '__root__') {
                 return this.controls;
             }
@@ -273,8 +352,7 @@
             return containerRef.control.children;
         },
 
-        /** @param {string} sourceId @param {any} control @param {number} index */
-        insertControlIntoSource(sourceId, control, index) {
+        insertControlIntoSource(sourceId: string, control: any, index: number): boolean {
             const list = this.getControlListBySource(sourceId);
             if (!list) {
                 return false;
@@ -292,8 +370,7 @@
             return true;
         },
 
-        /** @param {string} widget */
-        getControlDesignerHooks(widget) {
+        getControlDesignerHooks(widget: string): any {
             const key = String(widget || '').trim().toLowerCase();
             if (!key) {
                 return null;
@@ -307,8 +384,7 @@
             return registry[key] || null;
         },
 
-        /** @param {string} sourceId @param {any} control @param {string=} controlId */
-        canInsertIntoSource(sourceId, control, controlId = '') {
+        canInsertIntoSource(sourceId: string, control: any, controlId: string = ''): boolean {
             if (sourceId === '__root__') {
                 return true;
             }
@@ -332,36 +408,36 @@
             }) !== false;
         },
 
-        syncSortableDom() {
+        syncSortableDom(): void {
             this.recomputeDerivedStateKeys();
             this.controls = [...this.controls];
-            this.$nextTick(() => {
-                this.setupNestedSortables();
-                this.initDesignerWidgets();
-            });
+            if (this.$nextTick) {
+                this.$nextTick(() => {
+                    this.setupNestedSortables();
+                    this.initDesignerWidgets();
+                });
+            }
         },
 
-        /** @param {any} evt */
-        preparePaletteClone(evt) {
+        preparePaletteClone(evt: any): void {
             if (!evt || !evt.clone) {
                 return;
             }
 
-            const clone = evt.clone;
+            const clone = evt.clone as HTMLElement;
             clone.setAttribute('x-ignore', '');
             this.stripAlpineAttrs(clone);
         },
 
-        /** @param {Element} root */
-        stripAlpineAttrs(root) {
+        stripAlpineAttrs(root: Element | null): void {
             if (!root || !root.querySelectorAll) {
                 return;
             }
 
-            const nodes = [root, ...root.querySelectorAll('*')];
-            nodes.forEach((node) => {
+            const nodes: Element[] = [root, ...Array.from(root.querySelectorAll('*'))];
+            nodes.forEach((node: Element) => {
                 const attrs = Array.from(node.attributes || []);
-                attrs.forEach((attr) => {
+                attrs.forEach((attr: Attr) => {
                     const name = String(attr.name || '');
                     if (name.startsWith('x-') || name.startsWith(':') || name.startsWith('@')) {
                         node.removeAttribute(name);
@@ -370,7 +446,7 @@
             });
         },
 
-        initDesignerWidgets() {
+        initDesignerWidgets(): void {
             if (!this.$root) {
                 return;
             }
@@ -382,30 +458,30 @@
                 this.tomSelectInstances = new Map();
             }
 
-            this.flatpickrInstances.forEach((/** @type {any} */ instance, /** @type {any} */ element) => {
+            this.flatpickrInstances.forEach((instance: FlatpickrInstance, element: HTMLElement) => {
                 if (this.$root.contains(element)) {
                     return;
                 }
                 if (instance && instance.destroy) {
                     instance.destroy();
                 }
-                this.flatpickrInstances.delete(element);
+                this.flatpickrInstances!.delete(element);
             });
 
-            this.tomSelectInstances.forEach((/** @type {any} */ instance, /** @type {any} */ element) => {
+            this.tomSelectInstances.forEach((instance: TomSelectInstance, element: HTMLElement) => {
                 if (this.$root.contains(element)) {
                     return;
                 }
                 if (instance && instance.destroy) {
                     instance.destroy();
                 }
-                this.tomSelectInstances.delete(element);
+                this.tomSelectInstances!.delete(element);
             });
 
             if (windowAny.flatpickr) {
                 const inputs = this.$root.querySelectorAll('input[data-flatpickr]');
-                inputs.forEach((input) => {
-                    if (this.flatpickrInstances.has(input)) {
+                inputs.forEach((input: HTMLInputElement) => {
+                    if (this.flatpickrInstances!.has(input)) {
                         return;
                     }
 
@@ -420,21 +496,21 @@
                         minDate: mode === 'datetime' ? (input.dataset.minDateTime || null) : (input.dataset.minDate || null),
                         maxDate: mode === 'datetime' ? (input.dataset.maxDateTime || null) : (input.dataset.maxDate || null),
                         defaultDate: input.value || null,
-                        onChange: (selectedDates, dateStr) => {
+                        onChange: (selectedDates: Date[], dateStr: string) => {
                             if (controlId) {
                                 this.onCanvasDefaultTextChanged(controlId, dateStr || '');
                             }
                         }
                     });
 
-                    this.flatpickrInstances.set(input, instance);
+                    this.flatpickrInstances!.set(input, instance);
                 });
             }
 
             if (windowAny.TomSelect) {
                 const selects = this.$root.querySelectorAll('select[data-tom-select]');
-                selects.forEach((select) => {
-                    if (this.tomSelectInstances.has(select)) {
+                selects.forEach((select: HTMLSelectElement) => {
+                    if (this.tomSelectInstances!.has(select)) {
                         return;
                     }
 
@@ -451,10 +527,10 @@
                         searchField: ['text'],
                         preload: sourceType === 'remote' ? false : 'focus',
                         load: sourceType === 'remote'
-                            ? (query, callback) => {
+                            ? (query: string, callback: (items: any[]) => void) => {
                                 const targetUrl = sourceUrl ? new URL(sourceUrl, window.location.origin) : null;
                                 if (!targetUrl) {
-                                    callback();
+                                    callback([]);
                                     return;
                                 }
 
@@ -462,34 +538,34 @@
                                 fetch(targetUrl.toString(), {
                                     headers: { Accept: 'application/json' }
                                 })
-                                    .then((response) => response.ok ? response.json() : [])
-                                    .then((payload) => {
+                                    .then((response: Response) => response.ok ? response.json() : [])
+                                    .then((payload: any) => {
                                         const records = Array.isArray(payload)
                                             ? payload
                                             : (Array.isArray(payload?.items) ? payload.items : []);
-                                        callback(records.map((record) => ({
+                                        callback(records.map((record: any) => ({
                                             text: String(record?.[labelField] ?? record?.label ?? record?.[valueField] ?? ''),
                                             value: String(record?.[valueField] ?? record?.value ?? '')
                                         })));
                                     })
-                                    .catch(() => callback());
+                                    .catch(() => callback([]));
                             }
                             : undefined,
-                        onChange: (value) => {
+                        onChange: (value: any) => {
                             if (controlId) {
                                 this.onCanvasDefaultTextChanged(controlId, Array.isArray(value) ? (value[0] || '') : (value || ''));
                             }
                         }
                     });
 
-                    this.tomSelectInstances.set(select, instance);
+                    this.tomSelectInstances!.set(select, instance);
                 });
             }
         },
 
-        destroyDesignerWidgets() {
+        destroyDesignerWidgets(): void {
             if (this.flatpickrInstances) {
-                this.flatpickrInstances.forEach((instance) => {
+                this.flatpickrInstances.forEach((instance: FlatpickrInstance) => {
                     if (instance && instance.destroy) {
                         instance.destroy();
                     }
@@ -498,7 +574,7 @@
             }
 
             if (this.tomSelectInstances) {
-                this.tomSelectInstances.forEach((instance) => {
+                this.tomSelectInstances.forEach((instance: TomSelectInstance) => {
                     if (instance && instance.destroy) {
                         instance.destroy();
                     }
@@ -507,20 +583,20 @@
             }
         },
 
-        flashInvalidDrop(element) {
+        flashInvalidDrop(element: Element | null): void {
             if (!element || !element.classList) {
                 return;
             }
 
             element.classList.remove('invalid-drop-flash');
-            void element.offsetWidth;
+            void (element as HTMLElement).offsetWidth;
             element.classList.add('invalid-drop-flash');
 
             window.setTimeout(() => {
                 element.classList.remove('invalid-drop-flash');
             }, 280);
         }
-    });
+    };
 
     windowAny.formDesignerInteractionsSortable = sortableInteractionsApi;
 })();

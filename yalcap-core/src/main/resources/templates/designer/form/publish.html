@@ -5,6 +5,7 @@
         <form id="publish-form" method="post" th:action="${tenantId != null} ? @{/t/{tenantId}/designer/publish(tenantId=${tenantId})} : @{/designer/publish}" action="/designer/publish">
             <input type="hidden" name="kind" value="form" />
             <input type="hidden" name="definitionKey" id="publish-definitionKey" x-model="definitionKey" />
+            <input type="hidden" name="title" x-model="workflowTitle" />
             
             <div>
                 <label for="control-schema">Control Schema (HTML)</label>

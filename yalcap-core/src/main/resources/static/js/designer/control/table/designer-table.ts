@@ -1,15 +1,13 @@
 // @ts-check
-(function registerTableDesignerHooks(windowAny) {
-    const host = /** @type {any} */ (windowAny);
+(function registerTableDesignerHooks(windowAny: any) {
+    const host = windowAny as any;
     if (!host.designerControlHooks || typeof host.designerControlHooks !== 'object') {
         host.designerControlHooks = {};
     }
 
-    /** @type {DesignerControlHooksApi} */
-    const hooks = {
-        /** @param {DesignerControl} control @param {DesignerCoreApi} api */
-        normalize(control, api) {
-            const normalized = { ...(control || {}) };
+    const hooks: DesignerControlHooksApi = {
+        normalize(control: DesignerControl, api: DesignerCoreApi): DesignerControl {
+            const normalized = { ...(control || {}) } as DesignerControl;
 
             normalized.type = 'array';
             normalized.placeholder = '';
@@ -26,9 +24,9 @@
 
             const toIdentifier = api && typeof api.toIdentifier === 'function'
                 ? api.toIdentifier.bind(api)
-                : (v) => String(v || 'column').replace(/[^A-Za-z0-9_$]/g, '');
+                : (v: unknown) => String(v || 'column').replace(/[^A-Za-z0-9_$]/g, '');
 
-            normalized.tableColumns = normalized.tableColumns.map((col, idx) => ({
+            normalized.tableColumns = normalized.tableColumns.map((col: any, idx: number) => ({
                 key: toIdentifier(col.key || `column${idx + 1}`),
                 title: (col.title || col.key || `Column ${idx + 1}`).trim(),
                 type: (col.type || 'string').trim(),
@@ -59,8 +57,7 @@
             return normalized;
         },
 
-        /** @param {DesignerControl} normalized @param {string[]} errs @param {DesignerCoreApi} api */
-        validate(normalized, errs, api) {
+        validate(normalized: DesignerControl, errs: string[], api: DesignerCoreApi): void {
             if (!normalized || !Array.isArray(errs)) {
                 return;
             }
@@ -72,12 +69,12 @@
             if (!Array.isArray(normalized.tableColumns) || normalized.tableColumns.length === 0) {
                 errs.push('Table control requires at least one column.');
             } else {
-                const seen = new Set();
+                const seen = new Set<string>();
                 const isJsSafeIdentifier = api && typeof api.isJsSafeIdentifier === 'function'
                     ? api.isJsSafeIdentifier.bind(api)
-                    : (value) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test((value || '').trim());
+                    : (value: unknown) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test((value || '').toString().trim());
 
-                normalized.tableColumns.forEach((col) => {
+                normalized.tableColumns.forEach((col: any) => {
                     if (!col.key || !isJsSafeIdentifier(col.key)) {
                         errs.push('Each table column key must be a JS-safe identifier.');
                     }
@@ -91,7 +88,7 @@
                 });
             }
 
-            if (normalized.tableMaxItems > 0 && normalized.tableMaxItems < normalized.tableMinItems) {
+            if ((normalized.tableMaxItems ?? 0) > 0 && (normalized.tableMaxItems ?? 0) < (normalized.tableMinItems ?? 0)) {
                 errs.push('Table max rows must be greater than or equal to min rows.');
             }
         }

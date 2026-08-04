@@ -1,17 +1,30 @@
-window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target) {
+(function () {
+    const windowAny = window as any;
+
+interface WorkflowDesignerSchemaMixin {
+    stepTypes: Array<{ type?: string; outputCount?: number; defaultConfig?: Record<string, any> }>;
+    getStepTypeDescriptor(type: any): any;
+    getStepTypeOutputCount(type: any): number;
+    getStepTypeConfigDefaults(type: any): Record<string, any>;
+    createInitialConfig(step: any, type: any): Record<string, any>;
+    normalizeStep(step: any, idx: number): any;
+    resolveNextStepId(step: any): string;
+}
+
+    function workflowDesignerSchemaMixin(target: any): void {
     Object.assign(target, {
-        getStepTypeDescriptor(type) {
+        getStepTypeDescriptor(type: any) {
             const normalizedType = String(type || '').trim();
-            return this.stepTypes.find((descriptor) => String(descriptor.type || '').trim() === normalizedType) || null;
+            return this.stepTypes.find((descriptor: any) => String(descriptor.type || '').trim() === normalizedType) || null;
         },
 
-        getStepTypeOutputCount(type) {
+        getStepTypeOutputCount(type: any) {
             const descriptor = this.getStepTypeDescriptor(type);
             const outputCount = Number(descriptor && descriptor.outputCount);
             return outputCount > 1 ? outputCount : 1;
         },
 
-        getStepTypeConfigDefaults(type) {
+        getStepTypeConfigDefaults(type: any) {
             const descriptor = this.getStepTypeDescriptor(type);
             const defaults = descriptor && descriptor.defaultConfig && typeof descriptor.defaultConfig === 'object'
                 ? descriptor.defaultConfig
@@ -19,7 +32,7 @@ window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target
             return JSON.parse(JSON.stringify(defaults));
         },
 
-        createInitialConfig(step, type) {
+        createInitialConfig(step: any, type: any) {
             const defaults = this.getStepTypeConfigDefaults(type);
             const incomingConfig = step && step.config && typeof step.config === 'object' && !Array.isArray(step.config)
                 ? step.config
@@ -40,7 +53,7 @@ window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target
             return config;
         },
 
-        normalizeStep(step, idx) {
+        normalizeStep(step: any, idx: number) {
             const normalizedType = (step.type || (this.stepTypes[0] && this.stepTypes[0].type) || 'form').trim();
             const routing = step && step.routing && typeof step.routing === 'object' && !Array.isArray(step.routing)
                 ? step.routing
@@ -70,8 +83,8 @@ window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target
                     multiInstance: Boolean(assignment.multiInstance)
                 },
                 access: {
-                    groups: Array.isArray(access.groups) ? access.groups.map((v) => String(v || '').trim()).filter(Boolean) : [],
-                    users: Array.isArray(access.users) ? access.users.map((v) => String(v || '').trim()).filter(Boolean) : []
+                    groups: Array.isArray(access.groups) ? access.groups.map((v: any) => String(v || '').trim()).filter(Boolean) : [],
+                    users: Array.isArray(access.users) ? access.users.map((v: any) => String(v || '').trim()).filter(Boolean) : []
                 },
                 ui: {
                     pointer: String((ui.pointer || step.uiPointer || '')).trim(),
@@ -91,11 +104,12 @@ window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target
                 condition: step && step.condition && typeof step.condition === 'object' && !Array.isArray(step.condition)
                     ? JSON.parse(JSON.stringify(step.condition))
                     : null,
-                nodeId: step.nodeId || null
+                nodeId: step.nodeId || null,
+                next: step.next || null
             };
         },
 
-        resolveNextStepId(step) {
+        resolveNextStepId(step: any): string {
             const explicitNext = String((step && step.next) || '').trim();
             if (explicitNext) {
                 return explicitNext;
@@ -105,19 +119,22 @@ window.workflowDesignerSchemaMixin = function workflowDesignerSchemaMixin(target
             if (transitions && typeof transitions === 'object' && !Array.isArray(transitions)) {
                 const preferredKeys = ['onApprove', 'onSubmit', 'onAccept', 'onSuccess', 'default'];
                 const preferredTarget = preferredKeys
-                    .map((key) => String(transitions[key] || '').trim())
-                    .find((value) => Boolean(value));
+                    .map((key: string) => String(transitions[key] || '').trim())
+                    .find((value: string) => Boolean(value));
                 if (preferredTarget) {
                     return preferredTarget;
                 }
 
                 const firstTarget = Object.values(transitions)
-                    .map((value) => String(value || '').trim())
-                    .find((value) => Boolean(value));
+                    .map((value: any) => String(value || '').trim())
+                    .find((value: string) => Boolean(value));
                 return firstTarget || '';
             }
 
             return '';
         }
     });
-};
+    }
+
+    windowAny.workflowDesignerSchemaMixin = workflowDesignerSchemaMixin;
+})();

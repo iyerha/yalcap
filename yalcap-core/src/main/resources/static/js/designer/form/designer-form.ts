@@ -1,15 +1,150 @@
-// @ts-check
-function formDesigner() {
-    const windowAny = /** @type {any} */ (window);
-    const controlsApi = windowAny.formDesignerControls || {};
-    const schemaApi = windowAny.formDesignerSchema || {};
-    const propertiesApi = windowAny.formDesignerProperties || {};
-    const interactionsApi = windowAny.formDesignerInteractions || {};
-    const rulesApi = windowAny.formDesignerRules || {};
-    const definitionKeyEl = /** @type {HTMLInputElement | null} */ (document.getElementById('definitionKey'));
+// TypeScript Form Designer Factory
+
+interface PaletteItem {
+    label: string;
+    widget: string;
+    type: string;
+}
+
+interface CustomTheme {
+    accent: string;
+    bg: string;
+    surface: string;
+    text: string;
+}
+
+interface FormControl {
+    localId: string;
+    id: string;
+    name: string;
+    stateKey: string;
+    label: string;
+    nameManual: boolean;
+    type: string;
+    widget: string;
+    required: boolean;
+    visible: boolean;
+    enabled: boolean;
+    validationMessage: string;
+    hint: string;
+    hintFormat: string;
+    help: string;
+    helpFormat: string;
+    defaultValue: unknown;
+    colSpan: number;
+    placeholder: string;
+    options: unknown[];
+    autocompleteSourceType: string;
+    autocompleteSourceUrl: string;
+    autocompleteLabelField: string;
+    autocompleteValueField: string;
+    autocompleteSearchParam: string;
+    minDate: string;
+    maxDate: string;
+    minDateTime: string;
+    maxDateTime: string;
+    assetKey: string;
+    assetVersion: number;
+    assetHash: string;
+    assetPreviewUrl: string;
+    altText: string;
+    objectFit: string;
+    imageWidth: number;
+    imageHeight: number;
+    uploadAccept: string;
+    uploadAllowMultiple: boolean;
+    uploadMaxBytes: number;
+    buttonVariant: string;
+    buttonActionType: string;
+    buttonActionTarget: string;
+    buttonPayload: string;
+    buttonConfirmMessage: string;
+    messageTone: string;
+    messageTitle: string;
+    messageBody: string;
+    messageFormat: string;
+    repeatRenderer: string;
+    repeatMinItems: number;
+    repeatMaxItems: number;
+    repeatAllowAdd: boolean;
+    repeatAllowDelete: boolean;
+    repeatAllowReorder: boolean;
+    tableColumns: unknown[];
+    tableMinItems: number;
+    tableMaxItems: number;
+    tableAllowAdd: boolean;
+    tableAllowDelete: boolean;
+    tableAllowReorder: boolean;
+    sectionDescription: string;
+    sectionCollapsible: boolean;
+    sectionDefaultExpanded: boolean;
+    groupDescription: string;
+    children: FormControl[];
+    [key: string]: unknown;
+}
+
+interface FormDesignerState {
+    definitionKey: string;
+    formTitle: string;
+    activePage: string;
+    menuCollapsed: boolean;
+    paletteCollapsed: boolean;
+    propertiesCollapsed: boolean;
+    selectedTheme: string;
+    previewViewport: string;
+    customTheme: CustomTheme;
+    validationDisplayMode: string;
+    controlPalette: PaletteItem[];
+    controls: FormControl[];
+    columnOptions: number[];
+    selectedControlLocalId: string | null;
+    selectedControl: FormControl | null;
+    stateKeyEditEnabled: boolean;
+    lastSelectedAt: number;
+    paletteSortable: unknown;
+    canvasSortable: unknown;
+    nestedSortables: unknown;
+    sortableObserver: unknown;
+    sortableCleanupBound: unknown;
+    flatpickrInstances: unknown;
+    tomSelectInstances: unknown;
+    nextControlSeq: number;
+    resizingControlId: string | null;
+    resizeStartX: number;
+    resizeStartSpan: number;
+    resizeGridElement: unknown;
+    resizeMoveHandler?: (e: MouseEvent) => void;
+    resizeUpHandler?: (e: MouseEvent) => void;
+    resizeCancelHandler?: () => void;
+    resizeKeyHandler?: (e: KeyboardEvent) => void;
+    resizeVisibilityHandler?: () => void;
+    validationErrors: unknown[];
+    rules: unknown[];
+    decisionTableScope: string;
+    decisionTableDescription: string;
+    decisionInputColumns: unknown[];
+    decisionActionColumns: unknown[];
+    nextDecisionColumnSeq: number;
+    decisionTables: unknown[];
+    activeDecisionTableId: string | null;
+    nextDecisionTableSeq: number;
+    controlSchemaHtml: string;
+    dataSchemaYaml: string;
+    [key: string]: unknown;
+}
+
+function formDesigner(): FormDesignerState & { [key: string]: any } {
+    const windowAny = (window as unknown) as Record<string, unknown>;
+    const controlsApi = (windowAny.formDesignerControls as any) || {};
+    const schemaApi = (windowAny.formDesignerSchema as any) || {};
+    const propertiesApi = (windowAny.formDesignerProperties as any) || {};
+    const interactionsApi = (windowAny.formDesignerInteractions as any) || {};
+    const rulesApi = (windowAny.formDesignerRules as any) || {};
+    const definitionKeyEl = document.getElementById('definitionKey') as HTMLInputElement | null;
 
     return {
         definitionKey: definitionKeyEl ? definitionKeyEl.value : 'generated-definition',
+        formTitle: definitionKeyEl ? definitionKeyEl.value : '',
         activePage: 'builder',
         menuCollapsed: false,
         paletteCollapsed: false,
@@ -61,11 +196,11 @@ function formDesigner() {
         resizeStartX: 0,
         resizeStartSpan: 12,
         resizeGridElement: null,
-        resizeMoveHandler: null,
-        resizeUpHandler: null,
-        resizeCancelHandler: null,
-        resizeKeyHandler: null,
-        resizeVisibilityHandler: null,
+        resizeMoveHandler: undefined,
+        resizeUpHandler: undefined,
+        resizeCancelHandler: undefined,
+        resizeKeyHandler: undefined,
+        resizeVisibilityHandler: undefined,
         validationErrors: [],
         rules: [],
         decisionTableScope: 'form',
@@ -85,37 +220,37 @@ function formDesigner() {
         ...interactionsApi,
         ...rulesApi,
 
-        applyTheme() {
+        applyTheme(this: any): void {
             const host = this.$root;
             if (!host) {
                 return;
             }
 
             if (this.selectedTheme !== 'custom') {
-                host.style.removeProperty('--accent');
-                host.style.removeProperty('--bg');
-                host.style.removeProperty('--surface');
-                host.style.removeProperty('--text');
+                (host as HTMLElement).style.removeProperty('--accent');
+                (host as HTMLElement).style.removeProperty('--bg');
+                (host as HTMLElement).style.removeProperty('--surface');
+                (host as HTMLElement).style.removeProperty('--text');
                 return;
             }
 
-            host.style.setProperty('--accent', this.customTheme.accent);
-            host.style.setProperty('--bg', this.customTheme.bg);
-            host.style.setProperty('--surface', this.customTheme.surface);
-            host.style.setProperty('--text', this.customTheme.text);
+            (host as HTMLElement).style.setProperty('--accent', this.customTheme.accent);
+            (host as HTMLElement).style.setProperty('--bg', this.customTheme.bg);
+            (host as HTMLElement).style.setProperty('--surface', this.customTheme.surface);
+            (host as HTMLElement).style.setProperty('--text', this.customTheme.text);
         },
 
-        setActivePage(page) {
+        setActivePage(this: any, page: unknown): void {
             this.activePage = String(page || 'builder');
         },
 
-        setPreviewViewport(mode) {
+        setPreviewViewport(this: any, mode: unknown): void {
             const next = String(mode || '').toLowerCase();
             const allowed = new Set(['desktop', 'tablet', 'phone']);
             this.previewViewport = allowed.has(next) ? next : 'desktop';
         },
 
-        viewportPreviewHint() {
+        viewportPreviewHint(this: any): string {
             if (this.previewViewport === 'tablet') {
                 return 'Preview mode: tablet (approx 834px wide canvas).';
             }
@@ -125,7 +260,7 @@ function formDesigner() {
             return 'Preview mode: desktop (full canvas width).';
         },
 
-        previewColSpan(control) {
+        previewColSpan(this: any, control: any): number {
             const raw = Number(control && control.colSpan);
             const baseSpan = Number.isFinite(raw)
                 ? Math.max(1, Math.min(12, Math.round(raw)))
@@ -143,23 +278,23 @@ function formDesigner() {
             return baseSpan;
         },
 
-        toggleMenuCollapsed() {
+        toggleMenuCollapsed(this: any): void {
             this.menuCollapsed = !this.menuCollapsed;
         },
 
-        togglePaletteCollapsed() {
+        togglePaletteCollapsed(this: any): void {
             this.paletteCollapsed = !this.paletteCollapsed;
         },
 
-        togglePropertiesCollapsed() {
+        togglePropertiesCollapsed(this: any): void {
             this.propertiesCollapsed = !this.propertiesCollapsed;
         },
 
-        syncCurrentDecisionTable() {
+        syncCurrentDecisionTable(this: any): void {
             if (!this.activeDecisionTableId) {
                 return;
             }
-            const table = this.decisionTables.find((item) => item.id === this.activeDecisionTableId);
+            const table = this.decisionTables.find((item: any) => item.id === this.activeDecisionTableId);
             if (!table) {
                 return;
             }
@@ -170,7 +305,7 @@ function formDesigner() {
             table.decisionActionColumns = this.decisionActionColumns;
         },
 
-        newDecisionTable(name = '') {
+        newDecisionTable(this: any, name: string = ''): any {
             const next = this.nextDecisionTableSeq;
             this.nextDecisionTableSeq += 1;
             return {
@@ -184,7 +319,7 @@ function formDesigner() {
             };
         },
 
-        ensureDecisionTables() {
+        ensureDecisionTables(this: any): void {
             if (!Array.isArray(this.decisionTables)) {
                 this.decisionTables = [];
             }
@@ -198,15 +333,15 @@ function formDesigner() {
                 this.activeDecisionTableId = table.id;
             }
 
-            if (!this.activeDecisionTableId || !this.decisionTables.some((item) => item.id === this.activeDecisionTableId)) {
+            if (!this.activeDecisionTableId || !this.decisionTables.some((item: any) => item.id === this.activeDecisionTableId)) {
                 this.activeDecisionTableId = this.decisionTables[0].id;
             }
             this.selectDecisionTable(this.activeDecisionTableId);
         },
 
-        selectDecisionTable(tableId) {
+        selectDecisionTable(this: any, tableId: string): void {
             this.syncCurrentDecisionTable();
-            const table = this.decisionTables.find((item) => item.id === tableId);
+            const table = this.decisionTables.find((item: any) => item.id === tableId);
             if (!table) {
                 return;
             }
@@ -220,18 +355,18 @@ function formDesigner() {
             this.syncCurrentDecisionTable();
         },
 
-        addDecisionTable() {
+        addDecisionTable(this: any): void {
             this.syncCurrentDecisionTable();
             const table = this.newDecisionTable();
             this.decisionTables.push(table);
             this.selectDecisionTable(table.id);
         },
 
-        removeDecisionTable(tableId) {
+        removeDecisionTable(this: any, tableId: string): void {
             if (!tableId || !Array.isArray(this.decisionTables) || this.decisionTables.length <= 1) {
                 return;
             }
-            const idx = this.decisionTables.findIndex((item) => item.id === tableId);
+            const idx = this.decisionTables.findIndex((item: any) => item.id === tableId);
             if (idx < 0) {
                 return;
             }
@@ -244,8 +379,8 @@ function formDesigner() {
             }
         },
 
-        paletteIconSvg(widget) {
-            const icons = {
+        paletteIconSvg(this: any, widget: string): string {
+            const icons: Record<string, string> = {
                 text: '<svg viewBox="0 0 24 24" width="16" height="16" focusable="false" aria-hidden="true"><path d="M4 6h16M12 6v12M8 18h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
                 number: '<svg viewBox="0 0 24 24" width="16" height="16" focusable="false" aria-hidden="true"><path d="M7 5l-2 14M15 5l-2 14M4 10h16M3 15h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
                 textarea: '<svg viewBox="0 0 24 24" width="16" height="16" focusable="false" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 10h10M7 14h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
@@ -268,8 +403,8 @@ function formDesigner() {
             return icons[widget] || icons.text;
         },
 
-        removeControl(localId, event) {
-            if (!event || !event.target || !event.target.closest || !event.target.closest('.remove-control-btn')) {
+        removeControl(this: any, localId: string, event: Event): void {
+            if (!event || !(event.target instanceof Element) || !event.target.closest || !event.target.closest('.remove-control-btn')) {
                 return;
             }
 
@@ -292,12 +427,12 @@ function formDesigner() {
             }
         },
 
-        loadDefinition(definition) {
+        loadDefinition(this: any, definition: any): void {
             if (!definition || typeof definition !== 'object') {
                 return;
             }
-
             const form = definition.form || definition;
+            this.formTitle = definition.title ? String(definition.title).trim() : '';
             const controlSchema = form.controlSchema || {};
             const dataSchema = form.dataSchema || { properties: {} };
             const layout = Array.isArray(controlSchema.layout) ? controlSchema.layout : [];
@@ -308,10 +443,10 @@ function formDesigner() {
             this.selectedTheme = theme.preset || this.selectedTheme;
             if (theme.custom && typeof theme.custom === 'object') {
                 this.customTheme = {
-                    accent: theme.custom.accent || this.customTheme.accent,
-                    bg: theme.custom.bg || this.customTheme.bg,
-                    surface: theme.custom.surface || this.customTheme.surface,
-                    text: theme.custom.text || this.customTheme.text
+                    accent: (theme.custom as any).accent || this.customTheme.accent,
+                    bg: (theme.custom as any).bg || this.customTheme.bg,
+                    surface: (theme.custom as any).surface || this.customTheme.surface,
+                    text: (theme.custom as any).text || this.customTheme.text
                 };
             }
 
@@ -322,14 +457,14 @@ function formDesigner() {
             this.clearSelection();
         },
 
-        deriveDecisionTableFromRules(sourceRules = []) {
-            const grouped = new Map();
-            sourceRules.forEach((rule) => {
+        deriveDecisionTableFromRules(this: any, sourceRules: any[] = []): void {
+            const grouped = new Map<string, any[]>();
+            sourceRules.forEach((rule: any) => {
                 const scope = String(rule?.scope || 'form').trim() || 'form';
                 if (!grouped.has(scope)) {
                     grouped.set(scope, []);
                 }
-                grouped.get(scope).push(rule);
+                grouped.get(scope)!.push(rule);
             });
 
             this.decisionTables = [];
@@ -342,20 +477,20 @@ function formDesigner() {
             }
 
             let tableCount = 0;
-            grouped.forEach((rulesForScope, scope) => {
+            grouped.forEach((rulesForScope: any[], scope: string) => {
                 tableCount += 1;
                 const table = this.newDecisionTable(`Table ${tableCount}`);
                 table.scope = scope;
                 table.rules = rulesForScope;
 
-                const inputMap = new Map();
-                const actionMap = new Map();
-                const inputColumns = [];
-                const actionColumns = [];
+                const inputMap = new Map<string, string>();
+                const actionMap = new Map<string, string>();
+                const inputColumns: any[] = [];
+                const actionColumns: any[] = [];
 
-                table.rules.forEach((rule) => {
+                table.rules.forEach((rule: any) => {
                     const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
-                    conditions.forEach((condition) => {
+                    conditions.forEach((condition: any) => {
                         const field = String(condition?.field || '').trim();
                         if (!field || !field.startsWith('data.')) {
                             return;
@@ -370,9 +505,9 @@ function formDesigner() {
                     });
 
                     const actions = Array.isArray(rule.actions) ? rule.actions : [];
-                    actions.forEach((action) => {
+                    actions.forEach((action: any) => {
                         const kind = String(action?.kind || '').trim().toLowerCase();
-                        if (kind === 'derive' || kind === 'set' || action?.effect === 'derive') {
+                        if (kind === 'derive' || kind === 'set' || (action as any)?.effect === 'derive') {
                             const target = String(action?.target || '').trim();
                             if (!target) {
                                 return;
@@ -401,7 +536,7 @@ function formDesigner() {
                             return;
                         }
 
-                        if (kind === 'api' || action?.endpoint) {
+                        if (kind === 'api' || (action as any)?.endpoint) {
                             const endpoint = String(action?.endpoint || '').trim();
                             if (!endpoint) {
                                 return;
@@ -430,7 +565,7 @@ function formDesigner() {
                         }
 
                         const target = String(action?.target || '').trim();
-                        const intent = this.parseActionIntent(action?.intent || `${action?.effect || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`);
+                        const intent = this.parseActionIntent(action?.intent || `${(action as any)?.effect || 'visible'}:${this.normalizeBoolean((action as any)?.value) ? 'true' : 'false'}`);
                         const property = String(intent.effect || 'visible').trim() || 'visible';
                         if (!target) {
                             return;
@@ -455,20 +590,20 @@ function formDesigner() {
                     table.decisionActionColumns.push(this.newDecisionActionColumn('', 'visible'));
                 }
 
-                table.rules.forEach((rule) => {
+                table.rules.forEach((rule: any) => {
                     rule.runOnInit = rule.runOnInit === true;
                     rule.decisionInputs = {};
                     rule.decisionActions = {};
 
-                    table.decisionInputColumns.forEach((column) => {
+                    table.decisionInputColumns.forEach((column: any) => {
                         rule.decisionInputs[column.id] = { op: 'eq', value: '' };
                     });
-                    table.decisionActionColumns.forEach((column) => {
+                    table.decisionActionColumns.forEach((column: any) => {
                         rule.decisionActions[column.id] = '';
                     });
 
                     const conditions = Array.isArray(rule.conditions) ? rule.conditions : [];
-                    conditions.forEach((condition) => {
+                    conditions.forEach((condition: any) => {
                         const field = String(condition?.field || '').trim();
                         if (!field.startsWith('data.')) {
                             return;
@@ -479,7 +614,7 @@ function formDesigner() {
                             return;
                         }
                         const op = String(condition?.op || 'eq').trim() || 'eq';
-                        const cell = { op, value: '' };
+                        const cell: any = { op, value: '' };
                         if (op === 'in' || op === 'notIn') {
                             cell.value = String(condition?.valuesText || '').trim();
                         } else if (op === 'exists') {
@@ -491,9 +626,9 @@ function formDesigner() {
                     });
 
                     const actions = Array.isArray(rule.actions) ? rule.actions : [];
-                    actions.forEach((action) => {
+                    actions.forEach((action: any) => {
                         const kind = String(action?.kind || '').trim().toLowerCase();
-                        if (kind === 'derive' || kind === 'set' || action?.effect === 'derive') {
+                        if (kind === 'derive' || kind === 'set' || (action as any)?.effect === 'derive') {
                             const target = String(action?.target || '').trim();
                             if (!target) {
                                 return;
@@ -517,7 +652,7 @@ function formDesigner() {
                             return;
                         }
 
-                        if (kind === 'api' || action?.endpoint) {
+                        if (kind === 'api' || (action as any)?.endpoint) {
                             const endpoint = String(action?.endpoint || '').trim();
                             if (!endpoint) {
                                 return;
@@ -537,7 +672,7 @@ function formDesigner() {
                         }
 
                         const target = String(action?.target || '').trim();
-                        const intent = this.parseActionIntent(action?.intent || `${action?.effect || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`);
+                        const intent = this.parseActionIntent(action?.intent || `${(action as any)?.effect || 'visible'}:${this.normalizeBoolean((action as any)?.value) ? 'true' : 'false'}`);
                         const property = String(intent.effect || 'visible').trim() || 'visible';
                         const key = `${target}::${property}`;
                         const columnId = actionMap.get(key);
@@ -554,13 +689,13 @@ function formDesigner() {
             this.selectDecisionTable(this.decisionTables[0].id);
         },
 
-        hydrateRules(rules) {
-            return rules.map((rule, index) => {
+        hydrateRules(this: any, rules: any[]): any[] {
+            return rules.map((rule: any, index: number) => {
                 const hydratedActions = Array.isArray(rule.actions) && rule.actions.length > 0
                     ? rule.actions
-                        .map((action) => {
+                        .map((action: any) => {
                             const kind = String(action?.kind || '').trim().toLowerCase();
-                            if (kind === 'derive' || kind === 'set' || action?.effect === 'derive') {
+                            if (kind === 'derive' || kind === 'set' || (action as any)?.effect === 'derive') {
                                 const target = String(action?.target || '').trim();
                                 if (!target) {
                                     return null;
@@ -584,7 +719,7 @@ function formDesigner() {
                                 };
                             }
 
-                            if (kind === 'api' || action?.endpoint) {
+                            if (kind === 'api' || (action as any)?.endpoint) {
                                 const endpoint = String(action?.endpoint || '').trim();
                                 if (!endpoint) {
                                     return null;
@@ -607,18 +742,18 @@ function formDesigner() {
                             return {
                                 kind: 'ui',
                                 target,
-                                intent: `${String(action?.effect || 'visible').trim() || 'visible'}:${this.normalizeBoolean(action?.value) ? 'true' : 'false'}`
+                                intent: `${String((action as any)?.effect || 'visible').trim() || 'visible'}:${this.normalizeBoolean((action as any)?.value) ? 'true' : 'false'}`
                             };
                         })
-                        .filter(Boolean)
+                        .filter((x: any): x is any => x !== null)
                     : [{
                         kind: 'ui',
                         target: String(rule.target || ''),
                         intent: `${String(rule.effect || 'visible')}:${this.normalizeBoolean(rule.value) ? 'true' : 'false'}`
-                    }].filter((action) => action.target);
+                    }].filter((action: any) => action.target);
 
                 let conditions = [this.newConditionRow()];
-                const base = {
+                const base: any = {
                     id: String(rule.id || `rule-${index + 1}`),
                     scope: String(rule.scope || 'form'),
                     runOnInit: rule.runOnInit === true,
@@ -634,25 +769,25 @@ function formDesigner() {
                     return base;
                 }
 
-                if (rule.when.fact && rule.when.op) {
+                if ((rule.when as any).fact && (rule.when as any).op) {
                     base.conditions = [{
-                        field: String(rule.when.fact || ''),
-                        op: String(rule.when.op || 'eq'),
+                        field: String((rule.when as any).fact || ''),
+                        op: String((rule.when as any).op || 'eq'),
                         value: '',
                         valuesText: ''
                     }];
                     base.conditionMatchMode = 'all';
-                    if (Array.isArray(rule.when.values)) {
-                        base.conditions[0].valuesText = rule.when.values.join(', ');
+                    if (Array.isArray((rule.when as any).values)) {
+                        base.conditions[0].valuesText = (rule.when as any).values.join(', ');
                     }
-                    if (rule.when.value !== undefined && rule.when.value !== null) {
-                        base.conditions[0].value = String(rule.when.value);
+                    if ((rule.when as any).value !== undefined && (rule.when as any).value !== null) {
+                        base.conditions[0].value = String((rule.when as any).value);
                     }
                     return base;
                 }
 
-                if (rule.when.all && Array.isArray(rule.when.all)) {
-                    const mapped = rule.when.all.map((condition) => this.hydrateCondition(condition)).filter(Boolean);
+                if ((rule.when as any).all && Array.isArray((rule.when as any).all)) {
+                    const mapped = (rule.when as any).all.map((condition: any) => this.hydrateCondition(condition)).filter((x: any): x is any => x !== null);
                     if (mapped.length > 0) {
                         base.conditions = mapped;
                         base.conditionMatchMode = 'all';
@@ -660,8 +795,8 @@ function formDesigner() {
                     return base;
                 }
 
-                if (rule.when.any && Array.isArray(rule.when.any)) {
-                    const mapped = rule.when.any.map((condition) => this.hydrateCondition(condition)).filter(Boolean);
+                if ((rule.when as any).any && Array.isArray((rule.when as any).any)) {
+                    const mapped = (rule.when as any).any.map((condition: any) => this.hydrateCondition(condition)).filter((x: any): x is any => x !== null);
                     if (mapped.length > 0) {
                         base.conditions = mapped;
                         base.conditionMatchMode = 'any';
@@ -674,31 +809,31 @@ function formDesigner() {
             });
         },
 
-        hydrateCondition(condition) {
+        hydrateCondition(this: any, condition: any): any {
             if (!condition || typeof condition !== 'object') {
                 return null;
             }
-            if (condition.fact && condition.op) {
+            if ((condition as any).fact && (condition as any).op) {
                 return {
-                    field: String(condition.fact || ''),
-                    op: String(condition.op || 'eq'),
-                    value: condition.value !== undefined && condition.value !== null ? String(condition.value) : '',
-                    valuesText: Array.isArray(condition.values) ? condition.values.join(', ') : ''
+                    field: String((condition as any).fact || ''),
+                    op: String((condition as any).op || 'eq'),
+                    value: (condition as any).value !== undefined && (condition as any).value !== null ? String((condition as any).value) : '',
+                    valuesText: Array.isArray((condition as any).values) ? (condition as any).values.join(', ') : ''
                 };
             }
             return null;
         },
 
-        hydrateControls(layout, dataSchema, pointerBase) {
+        hydrateControls(this: any, layout: any[], dataSchema: any, pointerBase: string): FormControl[] {
             if (!Array.isArray(layout)) {
                 return [];
             }
 
-            return layout.map((item, index) => {
+            return layout.map((item: any, index: number) => {
                 const schemaNode = this.resolveSchemaNode(dataSchema, item.pointer || '');
                 const inferredWidget = this.inferHydratedWidget(item);
                 const name = this.pointerLeafName(item.pointer || '', index);
-                const base = {
+                const base: any = {
                     localId: this.newControlLocalId(),
                     id: this.ensureControlId(item.id),
                     name,
@@ -717,7 +852,7 @@ function formDesigner() {
                     helpFormat: String(item.helpFormat || 'markdown'),
                     defaultValue: this.hydrateDefaultValue(schemaNode, item),
                     colSpan: Number(item.colSpan) || 12,
-                    placeholder: String(schemaNode?.placeholder || ''),
+                    placeholder: String((schemaNode as any)?.placeholder || ''),
                     options: this.hydrateOptions(item, schemaNode),
                     autocompleteSourceType: String(item.autocompleteSourceType || 'static'),
                     autocompleteSourceUrl: String(item.autocompleteSourceUrl || ''),
@@ -728,9 +863,9 @@ function formDesigner() {
                     maxDate: String(item.maxDate || ''),
                     minDateTime: String(item.minDateTime || ''),
                     maxDateTime: String(item.maxDateTime || ''),
-                    assetKey: String(item.assetRef?.assetKey || ''),
-                    assetVersion: Number(item.assetRef?.version || 0),
-                    assetHash: String(item.assetRef?.sha256 || ''),
+                    assetKey: String((item.assetRef as any)?.assetKey || ''),
+                    assetVersion: Number((item.assetRef as any)?.version || 0),
+                    assetHash: String((item.assetRef as any)?.sha256 || ''),
                     assetPreviewUrl: '',
                     altText: String(item.alt || ''),
                     objectFit: String(item.fit || 'contain'),
@@ -749,14 +884,14 @@ function formDesigner() {
                     messageBody: String(item.messageBody || ''),
                     messageFormat: String(item.messageFormat || 'markdown'),
                     repeatRenderer: String(item.renderer || 'table'),
-                    repeatMinItems: Number(schemaNode?.minItems || item.minItems || 0),
-                    repeatMaxItems: Number(schemaNode?.maxItems || item.maxItems || 0),
+                    repeatMinItems: Number((schemaNode as any)?.minItems || item.minItems || 0),
+                    repeatMaxItems: Number((schemaNode as any)?.maxItems || item.maxItems || 0),
                     repeatAllowAdd: item.allowAdd !== false,
                     repeatAllowDelete: item.allowDelete !== false,
                     repeatAllowReorder: item.allowReorder === true,
                     tableColumns: this.hydrateTableColumns(item),
-                    tableMinItems: Number(schemaNode?.minItems || item.minItems || 0),
-                    tableMaxItems: Number(schemaNode?.maxItems || item.maxItems || 0),
+                    tableMinItems: Number((schemaNode as any)?.minItems || item.minItems || 0),
+                    tableMaxItems: Number((schemaNode as any)?.maxItems || item.maxItems || 0),
                     tableAllowAdd: item.allowAdd !== false,
                     tableAllowDelete: item.allowDelete !== false,
                     tableAllowReorder: item.allowReorder === true,
@@ -770,7 +905,7 @@ function formDesigner() {
                 if (Array.isArray(item.children) && item.children.length > 0) {
                     const childSchema = inferredWidget === 'group'
                         ? (schemaNode || { properties: {} })
-                        : (schemaNode?.items || dataSchema);
+                        : ((schemaNode as any)?.items || dataSchema);
                     const childPointerBase = inferredWidget === 'group'
                         ? `${pointerBase}/properties/${name}`
                         : `${pointerBase}/properties/${name}/items`;
@@ -781,14 +916,14 @@ function formDesigner() {
             });
         },
 
-        inferHydratedWidget(item) {
+        inferHydratedWidget(this: any, item: any): string {
             if (item.widget === 'repeat' && Array.isArray(item.columns) && item.columns.length > 0 && (!Array.isArray(item.children) || item.children.length === 0)) {
                 return 'table';
             }
             return String(item.widget || 'text');
         },
 
-        pointerLeafName(pointer, fallbackIndex) {
+        pointerLeafName(this: any, pointer: string, fallbackIndex: number): string {
             const raw = String(pointer || '');
             const parts = raw.split('/').filter(Boolean);
             for (let i = parts.length - 1; i >= 0; i -= 1) {
@@ -799,7 +934,7 @@ function formDesigner() {
             return `field${fallbackIndex + 1}`;
         },
 
-        resolveSchemaNode(rootSchema, pointer) {
+        resolveSchemaNode(this: any, rootSchema: any, pointer: string): any {
             if (!rootSchema || !pointer) {
                 return null;
             }
@@ -810,21 +945,21 @@ function formDesigner() {
                 const part = parts[i];
                 if (part === 'properties') {
                     const key = parts[i + 1];
-                    current = current?.properties?.[key] || null;
+                    current = (current as any)?.properties?.[key] || null;
                     i += 1;
                     continue;
                 }
                 if (part === 'items') {
-                    current = current?.items || null;
+                    current = (current as any)?.items || null;
                 }
             }
 
             return current || null;
         },
 
-        inferSchemaType(schemaNode, item) {
-            if (schemaNode?.type) {
-                return String(schemaNode.type);
+        inferSchemaType(this: any, schemaNode: any, item: any): string {
+            if ((schemaNode as any)?.type) {
+                return String((schemaNode as any).type);
             }
             if (item.widget === 'checkbox') {
                 return 'array';
@@ -844,9 +979,9 @@ function formDesigner() {
             return 'string';
         },
 
-        hydrateDefaultValue(schemaNode, item) {
+        hydrateDefaultValue(this: any, schemaNode: any, item: any): unknown {
             if (schemaNode && Object.prototype.hasOwnProperty.call(schemaNode, 'default')) {
-                return schemaNode.default;
+                return (schemaNode as any).default;
             }
             if (item.widget === 'checkbox') {
                 return [];
@@ -863,32 +998,32 @@ function formDesigner() {
             return '';
         },
 
-        hydrateOptions(item, schemaNode) {
+        hydrateOptions(this: any, item: any, schemaNode: any): any[] {
             if (Array.isArray(item.options) && item.options.length > 0) {
-                return item.options.map((option) => ({
+                return item.options.map((option: any) => ({
                     label: String(option.label || option.value || ''),
                     value: String(option.value || ''),
                     autoValue: false
                 }));
             }
 
-            const enumValues = Array.isArray(schemaNode?.enum)
-                ? schemaNode.enum
-                : (Array.isArray(schemaNode?.items?.enum) ? schemaNode.items.enum : []);
+            const enumValues = Array.isArray((schemaNode as any)?.enum)
+                ? (schemaNode as any).enum
+                : (Array.isArray((schemaNode as any)?.items?.enum) ? (schemaNode as any).items.enum : []);
 
-            return enumValues.map((value) => ({
+            return enumValues.map((value: unknown) => ({
                 label: String(value),
                 value: String(value),
                 autoValue: false
             }));
         },
 
-        hydrateTableColumns(item) {
+        hydrateTableColumns(this: any, item: any): any[] {
             if (!Array.isArray(item.columns)) {
                 return [];
             }
 
-            return item.columns.map((column, index) => ({
+            return item.columns.map((column: any, index: number) => ({
                 key: this.toIdentifier(column.key || `column${index + 1}`),
                 title: String(column.title || column.key || `Column ${index + 1}`),
                 type: String(column.type || 'string'),
@@ -897,205 +1032,199 @@ function formDesigner() {
             }));
         },
 
-    generate() {
-        // Generate controlSchema (HTML from controls)
-        this.controlSchemaHtml = this.generateControlSchema();
-        
-        // Generate dataSchema (YAML from properties)
-        this.dataSchemaYaml = this.generateDataSchema();
-    },
+        generate(this: any): void {
+            this.controlSchemaHtml = this.generateControlSchema();
+            this.dataSchemaYaml = this.generateDataSchema();
+        },
 
-    generateControlSchema() {
-        const controlsHtml = this.controls
-            .map(control => this.controlToHtml(control, 1))
-            .join('\n');
-        return `<form th:fragment="form">\n${controlsHtml}\n</form>`;
-    },
+        generateControlSchema(this: any): string {
+            const controlsHtml = this.controls
+                .map((control: any) => this.controlToHtml(control, 1))
+                .join('\n');
+            const titleAttr = this.formTitle ? ` data-title="${this.escapeHtml(this.formTitle)}"` : '';
+            return `<form th:fragment="form"${titleAttr}>\n${controlsHtml}\n</form>`;
+        },
 
-    generateDataSchema() {
-        const properties = this.buildSchemaProperties();
-        return this.toYaml({ properties });
-    },
+        generateDataSchema(this: any): string {
+            const properties = this.buildSchemaProperties();
+            return this.toYaml({ properties });
+        },
 
-    buildSchemaProperties() {
-        const properties = {};
-        this.controls.forEach(control => {
-            this.addControlToSchema(properties, control);
-        });
-        return properties;
-    },
+        buildSchemaProperties(this: any): Record<string, any> {
+            const properties: Record<string, any> = {};
+            this.controls.forEach((control: FormControl) => {
+                this.addControlToSchema(properties, control);
+            });
+            return properties;
+        },
 
-    addControlToSchema(properties, control) {
-        if (!control.stateKey || !control.name) {
-            return;
-        }
-        
-        const widget = String(control.widget || 'text');
-        if (widget === 'section' || widget === 'group' || widget === 'button' || widget === 'message') {
-            // Don't create schema entries for layout/action-only controls
-            if (widget === 'group' || widget === 'section') {
-                const groupSchema = { type: 'object', properties: {} };
-                if (Array.isArray(control.children)) {
-                    control.children.forEach(child => {
-                        this.addControlToSchema(groupSchema.properties, child);
-                    });
+        addControlToSchema(this: any, properties: Record<string, any>, control: FormControl): void {
+            if (!control.stateKey || !control.name) {
+                return;
+            }
+
+            const widget = String(control.widget || 'text');
+            if (widget === 'section' || widget === 'group' || widget === 'button' || widget === 'message') {
+                if (widget === 'group' || widget === 'section') {
+                    const groupSchema: any = { type: 'object', properties: {} };
+                    if (Array.isArray(control.children)) {
+                        control.children.forEach((child: FormControl) => {
+                            this.addControlToSchema(groupSchema.properties, child);
+                        });
+                    }
+                    properties[control.stateKey] = groupSchema;
                 }
-                properties[control.stateKey] = groupSchema;
+                return;
             }
-            return;
-        }
-        
-        const schemaType = this.inferSchemaType(null, control);
-        const prop = { type: schemaType };
-        
-        if (control.required) {
-            prop.required = true;
-        }
-        
-        if (control.hint) {
-            prop.description = control.hint;
-        }
-        
-        if (control.placeholder) {
-            prop.placeholder = control.placeholder;
-        }
-        
-        if (control.defaultValue !== undefined && control.defaultValue !== '' && control.defaultValue !== null) {
-            prop.default = control.defaultValue;
-        }
-        
-        // Add enum for select/radio/checkbox if options exist
-        if (Array.isArray(control.options) && control.options.length > 0) {
-            prop.enum = control.options.map(opt => opt.value);
-        }
-        
-        properties[control.stateKey] = prop;
-    },
 
-    controlToHtml(control, indentLevel = 1) {
-        const indent = ' '.repeat(indentLevel * 2);
-        const widget = String(control.widget || 'text');
-        const name = control.stateKey || control.name || '';
-        
-        if (widget === 'section') {
-            const childrenHtml = Array.isArray(control.children)
-                ? control.children.map(c => this.controlToHtml(c, indentLevel + 1)).join('\n')
-                : '';
-            return `${indent}<fieldset>\n${indent}  <legend>${control.label}</legend>\n${childrenHtml}\n${indent}</fieldset>`;
-        }
-        
-        if (widget === 'group') {
-            const childrenHtml = Array.isArray(control.children)
-                ? control.children.map(c => this.controlToHtml(c, indentLevel + 1)).join('\n')
-                : '';
-            return `${indent}<div class="form-group">\n${childrenHtml}\n${indent}</div>`;
-        }
-        
-        if (widget === 'message') {
-            return `${indent}<div class="form-message" data-tone="${control.messageTone}">${control.messageBody}</div>`;
-        }
-        
-        if (widget === 'button') {
-            return `${indent}<button type="button" class="btn btn-${control.buttonVariant}">${control.label}</button>`;
-        }
-        
-        if (widget === 'repeat' || widget === 'table') {
-            return `${indent}<div class="form-repeat" data-widget="${widget}" name="${name}"></div>`;
-        }
-        
-        // Standard input controls
-        const attrs = [`name="${name}"`];
-        if (control.required) {
-            attrs.push('required');
-        }
-        if (control.placeholder) {
-            attrs.push(`placeholder="${this.escapeHtml(control.placeholder)}"`);
-        }
-        if (control.hint) {
-            attrs.push(`title="${this.escapeHtml(control.hint)}"`);
-        }
-        
-        const attrStr = attrs.join(' ');
-        const label = control.label ? `${indent}  <label for="${name}">${this.escapeHtml(control.label)}</label>\n` : '';
-        
-        let inputHtml = '';
-        switch (widget) {
-            case 'textarea':
-                inputHtml = `${indent}  <textarea id="${name}" ${attrStr}></textarea>`;
-                break;
-            case 'select':
-            case 'radio':
-            case 'checkbox':
-                const options = Array.isArray(control.options)
-                    ? control.options.map(opt => `${indent}    <option value="${this.escapeHtml(opt.value)}">${this.escapeHtml(opt.label)}</option>`).join('\n')
+            const schemaType = this.inferSchemaType(null, control);
+            const prop: any = { type: schemaType };
+
+            if (control.required) {
+                prop.required = true;
+            }
+
+            if (control.hint) {
+                prop.description = control.hint;
+            }
+
+            if (control.placeholder) {
+                prop.placeholder = control.placeholder;
+            }
+
+            if (control.defaultValue !== undefined && control.defaultValue !== '' && control.defaultValue !== null) {
+                prop.default = control.defaultValue;
+            }
+
+            if (Array.isArray(control.options) && control.options.length > 0) {
+                prop.enum = control.options.map((opt: any) => opt.value);
+            }
+
+            properties[control.stateKey] = prop;
+        },
+
+        controlToHtml(this: any, control: FormControl, indentLevel: number = 1): string {
+            const indent = ' '.repeat(indentLevel * 2);
+            const widget = String(control.widget || 'text');
+            const name = control.stateKey || control.name || '';
+
+            if (widget === 'section') {
+                const childrenHtml = Array.isArray(control.children)
+                    ? control.children.map((c: FormControl) => this.controlToHtml(c, indentLevel + 1)).join('\n')
                     : '';
-                inputHtml = `${indent}  <select id="${name}" ${attrStr}>\n${options}\n${indent}  </select>`;
-                break;
-            case 'date':
-                inputHtml = `${indent}  <input type="date" id="${name}" ${attrStr} />`;
-                break;
-            case 'datetime':
-                inputHtml = `${indent}  <input type="datetime-local" id="${name}" ${attrStr} />`;
-                break;
-            case 'number':
-                inputHtml = `${indent}  <input type="number" id="${name}" ${attrStr} />`;
-                break;
-            case 'booleanCheckbox':
-                inputHtml = `${indent}  <input type="checkbox" id="${name}" ${attrStr} />`;
-                break;
-            case 'upload':
-                inputHtml = `${indent}  <input type="file" id="${name}" ${attrStr} ${control.uploadAllowMultiple ? 'multiple' : ''} />`;
-                break;
-            case 'image':
-                inputHtml = `${indent}  <img id="${name}" alt="${this.escapeHtml(control.altText)}" />`;
-                break;
-            default:
-                inputHtml = `${indent}  <input type="text" id="${name}" ${attrStr} />`;
-        }
-        
-        return `${label}${inputHtml}`;
-    },
+                return `${indent}<fieldset>\n${indent}  <legend>${control.label}</legend>\n${childrenHtml}\n${indent}</fieldset>`;
+            }
 
-    toYaml(obj) {
-        const lines = [];
-        const stringify = (val, indent = 0) => {
-            const spaces = ' '.repeat(indent);
-            if (val === null || val === undefined) {
-                return 'null';
+            if (widget === 'group') {
+                const childrenHtml = Array.isArray(control.children)
+                    ? control.children.map((c: FormControl) => this.controlToHtml(c, indentLevel + 1)).join('\n')
+                    : '';
+                return `${indent}<div class="form-group">\n${childrenHtml}\n${indent}</div>`;
             }
-            if (typeof val === 'boolean') {
-                return val ? 'true' : 'false';
+
+            if (widget === 'message') {
+                return `${indent}<div class="form-message" data-tone="${control.messageTone}">${control.messageBody}</div>`;
             }
-            if (typeof val === 'number') {
+
+            if (widget === 'button') {
+                return `${indent}<button type="button" class="btn btn-${control.buttonVariant}">${control.label}</button>`;
+            }
+
+            if (widget === 'repeat' || widget === 'table') {
+                return `${indent}<div class="form-repeat" data-widget="${widget}" name="${name}"></div>`;
+            }
+
+            const attrs = [`name="${name}"`];
+            if (control.required) {
+                attrs.push('required');
+            }
+            if (control.placeholder) {
+                attrs.push(`placeholder="${this.escapeHtml(control.placeholder)}"`);
+            }
+            if (control.hint) {
+                attrs.push(`title="${this.escapeHtml(control.hint)}"`);
+            }
+
+            const attrStr = attrs.join(' ');
+            const label = control.label ? `${indent}  <label for="${name}">${this.escapeHtml(control.label)}</label>\n` : '';
+
+            let inputHtml = '';
+            switch (widget) {
+                case 'textarea':
+                    inputHtml = `${indent}  <textarea id="${name}" ${attrStr}></textarea>`;
+                    break;
+                case 'select':
+                case 'radio':
+                case 'checkbox':
+                    const options = Array.isArray(control.options)
+                        ? control.options.map((opt: any) => `${indent}    <option value="${this.escapeHtml(opt.value)}">${this.escapeHtml(opt.label)}</option>`).join('\n')
+                        : '';
+                    inputHtml = `${indent}  <select id="${name}" ${attrStr}>\n${options}\n${indent}  </select>`;
+                    break;
+                case 'date':
+                    inputHtml = `${indent}  <input type="date" id="${name}" ${attrStr} />`;
+                    break;
+                case 'datetime':
+                    inputHtml = `${indent}  <input type="datetime-local" id="${name}" ${attrStr} />`;
+                    break;
+                case 'number':
+                    inputHtml = `${indent}  <input type="number" id="${name}" ${attrStr} />`;
+                    break;
+                case 'booleanCheckbox':
+                    inputHtml = `${indent}  <input type="checkbox" id="${name}" ${attrStr} />`;
+                    break;
+                case 'upload':
+                    inputHtml = `${indent}  <input type="file" id="${name}" ${attrStr} ${control.uploadAllowMultiple ? 'multiple' : ''} />`;
+                    break;
+                case 'image':
+                    inputHtml = `${indent}  <img id="${name}" alt="${this.escapeHtml(control.altText)}" />`;
+                    break;
+                default:
+                    inputHtml = `${indent}  <input type="text" id="${name}" ${attrStr} />`;
+            }
+
+            return `${label}${inputHtml}`;
+        },
+
+        toYaml(this: any, obj: any): string {
+            const lines: string[] = [];
+            const stringify = (val: any, indent: number = 0): string => {
+                const spaces = ' '.repeat(indent);
+                if (val === null || val === undefined) {
+                    return 'null';
+                }
+                if (typeof val === 'boolean') {
+                    return val ? 'true' : 'false';
+                }
+                if (typeof val === 'number') {
+                    return String(val);
+                }
+                if (typeof val === 'string') {
+                    return `"${val.replace(/"/g, '\\"')}"`;
+                }
+                if (Array.isArray(val)) {
+                    return `[\n${val.map(item => `${spaces}  - ${stringify(item, indent + 2)}`).join('\n')}\n${spaces}]`;
+                }
+                if (typeof val === 'object') {
+                    const entries = Object.entries(val).filter(([, v]) => v !== undefined);
+                    return entries.map(([k, v]) => `${spaces}${k}: ${stringify(v, indent + 2)}`).join('\n');
+                }
                 return String(val);
-            }
-            if (typeof val === 'string') {
-                return `"${val.replace(/"/g, '\\"')}"`;
-            }
-            if (Array.isArray(val)) {
-                return `[\n${val.map(item => `${spaces}  - ${stringify(item, indent + 2)}`).join('\n')}\n${spaces}]`;
-            }
-            if (typeof val === 'object') {
-                const entries = Object.entries(val).filter(([, v]) => v !== undefined);
-                return entries.map(([k, v]) => `${spaces}${k}: ${stringify(v, indent + 2)}`).join('\n');
-            }
-            return String(val);
-        };
-        
-        return stringify(obj);
-    },
+            };
 
-    escapeHtml(text) {
-        if (!text) return '';
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
+            return stringify(obj);
+        },
+
+        escapeHtml(this: any, text: string): string {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
     };
 }
 
-const windowAny = /** @type {any} */ (window);
 windowAny.formDesigner = formDesigner;

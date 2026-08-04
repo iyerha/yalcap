@@ -1,15 +1,13 @@
 // @ts-check
-(function registerAutocompleteDesignerHooks(windowAny) {
-    const host = /** @type {any} */ (windowAny);
+(function registerAutocompleteDesignerHooks(windowAny: any) {
+    const host = windowAny as any;
     if (!host.designerControlHooks || typeof host.designerControlHooks !== 'object') {
         host.designerControlHooks = {};
     }
 
-    /** @type {DesignerControlHooksApi} */
-    const hooks = {
-        /** @param {DesignerControl} control @param {DesignerCoreApi} api */
-        normalize(control, api) {
-            const normalized = { ...(control || {}) };
+    const hooks: DesignerControlHooksApi = {
+        normalize(control: DesignerControl, api: DesignerCoreApi): DesignerControl {
+            const normalized = { ...(control || {}) } as DesignerControl;
 
             normalized.autocompleteSourceType = (normalized.autocompleteSourceType || 'static').trim() || 'static';
             normalized.autocompleteSourceUrl = (normalized.autocompleteSourceUrl || '').trim();
@@ -40,8 +38,7 @@
             return normalized;
         },
 
-        /** @param {DesignerControl} normalized @param {string[]} errs */
-        validate(normalized, errs) {
+        validate(normalized: DesignerControl, errs: string[]): void {
             if (!normalized || !Array.isArray(errs)) {
                 return;
             }

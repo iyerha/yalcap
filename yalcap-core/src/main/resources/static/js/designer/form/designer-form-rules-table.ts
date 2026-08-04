@@ -1,11 +1,111 @@
-// @ts-nocheck
-(function initFormDesignerRulesTable(windowAny) {
-    windowAny.formDesignerRulesTable = {
-        syncCurrentDecisionTable() {
+interface DecisionInputCell {
+    op: string;
+    value: string;
+}
+
+interface RuleCondition {
+    field: string;
+    op: string;
+    value: string;
+    valuesText?: string;
+}
+
+interface RuleAction {
+    target?: string;
+    intent?: string;
+}
+
+interface DecisionTableRule {
+    id: string;
+    scope?: string;
+    runOnInit?: boolean;
+    whenFact?: string;
+    whenOp?: string;
+    whenValue?: string;
+    whenValuesText?: string;
+    whenJsonLogic?: string;
+    conditionMatchMode?: string;
+    conditions: RuleCondition[];
+    actions: RuleAction[];
+    decisionInputs: Record<string, DecisionInputCell>;
+    decisionActions: Record<string, string>;
+}
+
+interface OperatorOption {
+    value: string;
+    label: string;
+}
+
+interface FormDesignerRulesTable {
+    activeDecisionTableId: string | null;
+    nextDecisionTableSeq: number;
+    nextDecisionColumnSeq: number;
+    decisionTableScope: string;
+    decisionTableDescription: string;
+    rules: DecisionTableRule[];
+    decisionInputColumns: DecisionInputColumn[];
+    decisionActionColumns: DecisionActionColumn[];
+    syncCurrentDecisionTable(): void;
+    newDecisionTable(name?: string): any;
+    ensureDecisionTables(): void;
+    selectDecisionTable(tableId: string): void;
+    addDecisionTable(): void;
+    removeDecisionTable(tableId: string): void;
+    addRule(): void;
+    insertRuleAfter(index: number): void;
+    newConditionRow(): RuleCondition;
+    addRuleCondition(rule: DecisionTableRule): void;
+    removeRuleCondition(rule: DecisionTableRule, conditionIndex: number): void;
+    moveRuleUp(index: number): void;
+    moveRuleDown(index: number): void;
+    removeRule(index: number): void;
+    addRuleAction(rule: DecisionTableRule): void;
+    removeRuleAction(rule: DecisionTableRule, actionIndex: number): void;
+    ensureRuleRowDefaults(rule: DecisionTableRule): void;
+    primaryCondition(rule: DecisionTableRule): RuleCondition;
+    primaryAction(rule: DecisionTableRule): RuleAction;
+    isSetMembershipOperator(op: string): boolean;
+    newDecisionInputColumn(stateKey?: string): DecisionInputColumn;
+    newDecisionActionColumn(target?: string, property?: string): DecisionActionColumn;
+    ensureDecisionTableSchema(): void;
+    addDecisionInputColumn(): void;
+    insertDecisionInputColumnAfter(columnId: string): void;
+    removeDecisionInputColumn(columnId: string): void;
+    addDecisionActionColumn(): void;
+    insertDecisionActionColumnAfter(columnId: string): void;
+    removeDecisionActionColumn(columnId: string): void;
+    decisionInputCell(rule: DecisionTableRule, columnId: string): string;
+    setDecisionInputCell(rule: DecisionTableRule, columnId: string, value: string): void;
+    decisionInputOperator(rule: DecisionTableRule, columnId: string): string;
+    setDecisionInputOperator(rule: DecisionTableRule, columnId: string, op: string): void;
+    operatorOptionsForInputColumn(column: DecisionInputColumn): OperatorOption[];
+    ruleInputColumnMeta(column: DecisionInputColumn): StateKeyOption | null;
+    ruleInputColumnType(column: DecisionInputColumn): string;
+    inputCellValueInputType(rule: DecisionTableRule, columnId: string, column: DecisionInputColumn): string;
+    decisionMatrixGridStyle(): string;
+    decisionActionCell(rule: DecisionTableRule, columnId: string): string;
+    setDecisionActionCell(rule: DecisionTableRule, columnId: string, value: string): void;
+    availableStateKeys(): string[];
+    availableStateKeyOptions(): StateKeyOption[];
+    [key: string]: any;
+}
+
+(function initFormDesignerRulesTable(windowAny: any) {
+    const api: FormDesignerRulesTable = {
+        activeDecisionTableId: null,
+        nextDecisionTableSeq: 0,
+        nextDecisionColumnSeq: 0,
+        decisionTableScope: 'form',
+        decisionTableDescription: '',
+        rules: [],
+        decisionInputColumns: [],
+        decisionActionColumns: [],
+
+        syncCurrentDecisionTable(): void {
             if (!this.activeDecisionTableId) {
                 return;
             }
-            const table = this.decisionTables.find((item) => item.id === this.activeDecisionTableId);
+            const table = this.decisionTables.find((item: any) => item.id === this.activeDecisionTableId);
             if (!table) {
                 return;
             }
@@ -16,7 +116,7 @@
             table.decisionActionColumns = this.decisionActionColumns;
         },
 
-        newDecisionTable(name = '') {
+        newDecisionTable(name: string = ''): any {
             const next = this.nextDecisionTableSeq;
             this.nextDecisionTableSeq += 1;
             return {
@@ -30,7 +130,7 @@
             };
         },
 
-        ensureDecisionTables() {
+        ensureDecisionTables(): void {
             if (!Array.isArray(this.decisionTables)) {
                 this.decisionTables = [];
             }
@@ -44,15 +144,15 @@
                 this.activeDecisionTableId = table.id;
             }
 
-            if (!this.activeDecisionTableId || !this.decisionTables.some((item) => item.id === this.activeDecisionTableId)) {
+            if (!this.activeDecisionTableId || !this.decisionTables.some((item: any) => item.id === this.activeDecisionTableId)) {
                 this.activeDecisionTableId = this.decisionTables[0].id;
             }
             this.selectDecisionTable(this.activeDecisionTableId);
         },
 
-        selectDecisionTable(tableId) {
+        selectDecisionTable(tableId: string): void {
             this.syncCurrentDecisionTable();
-            const table = this.decisionTables.find((item) => item.id === tableId);
+            const table = this.decisionTables.find((item: any) => item.id === tableId);
             if (!table) {
                 return;
             }
@@ -66,18 +166,18 @@
             this.syncCurrentDecisionTable();
         },
 
-        addDecisionTable() {
+        addDecisionTable(): void {
             this.syncCurrentDecisionTable();
             const table = this.newDecisionTable();
             this.decisionTables.push(table);
             this.selectDecisionTable(table.id);
         },
 
-        removeDecisionTable(tableId) {
+        removeDecisionTable(tableId: string): void {
             if (!tableId || !Array.isArray(this.decisionTables) || this.decisionTables.length <= 1) {
                 return;
             }
-            const idx = this.decisionTables.findIndex((item) => item.id === tableId);
+            const idx = this.decisionTables.findIndex((item: any) => item.id === tableId);
             if (idx < 0) {
                 return;
             }
@@ -90,15 +190,15 @@
             }
         },
 
-        addRule() {
+        addRule(): void {
             const nextIndex = this.rules.length + 1;
             this.ensureDecisionTableSchema();
-            const decisionInputs = {};
-            const decisionActions = {};
-            this.decisionInputColumns.forEach((column) => {
+            const decisionInputs: Record<string, DecisionInputCell> = {};
+            const decisionActions: Record<string, string> = {};
+            this.decisionInputColumns.forEach((column: DecisionInputColumn) => {
                 decisionInputs[column.id] = { op: 'eq', value: '' };
             });
-            this.decisionActionColumns.forEach((column) => {
+            this.decisionActionColumns.forEach((column: DecisionActionColumn) => {
                 decisionActions[column.id] = '';
             });
             this.rules.push({
@@ -120,18 +220,18 @@
             });
         },
 
-        insertRuleAfter(index) {
+        insertRuleAfter(index: number): void {
             const nextIndex = this.rules.length + 1;
             this.ensureDecisionTableSchema();
-            const decisionInputs = {};
-            const decisionActions = {};
-            this.decisionInputColumns.forEach((column) => {
+            const decisionInputs: Record<string, DecisionInputCell> = {};
+            const decisionActions: Record<string, string> = {};
+            this.decisionInputColumns.forEach((column: DecisionInputColumn) => {
                 decisionInputs[column.id] = { op: 'eq', value: '' };
             });
-            this.decisionActionColumns.forEach((column) => {
+            this.decisionActionColumns.forEach((column: DecisionActionColumn) => {
                 decisionActions[column.id] = '';
             });
-            const rule = {
+            const rule: DecisionTableRule = {
                 id: `rule-${nextIndex}`,
                 scope: 'form',
                 runOnInit: false,
@@ -156,18 +256,18 @@
             this.rules.splice(index + 1, 0, rule);
         },
 
-        newConditionRow() {
+        newConditionRow(): RuleCondition {
             return { field: '', op: 'eq', value: '', valuesText: '' };
         },
 
-        addRuleCondition(rule) {
+        addRuleCondition(rule: DecisionTableRule): void {
             if (!rule || !Array.isArray(rule.conditions)) {
                 return;
             }
             rule.conditions.push(this.newConditionRow());
         },
 
-        removeRuleCondition(rule, conditionIndex) {
+        removeRuleCondition(rule: DecisionTableRule, conditionIndex: number): void {
             if (!rule || !Array.isArray(rule.conditions) || rule.conditions.length <= 1) {
                 return;
             }
@@ -177,7 +277,7 @@
             rule.conditions.splice(conditionIndex, 1);
         },
 
-        moveRuleUp(index) {
+        moveRuleUp(index: number): void {
             if (index <= 0 || index >= this.rules.length) {
                 return;
             }
@@ -186,7 +286,7 @@
             this.rules[index] = prev;
         },
 
-        moveRuleDown(index) {
+        moveRuleDown(index: number): void {
             if (index < 0 || index >= this.rules.length - 1) {
                 return;
             }
@@ -195,21 +295,21 @@
             this.rules[index] = next;
         },
 
-        removeRule(index) {
+        removeRule(index: number): void {
             if (index < 0 || index >= this.rules.length) {
                 return;
             }
             this.rules.splice(index, 1);
         },
 
-        addRuleAction(rule) {
+        addRuleAction(rule: DecisionTableRule): void {
             if (!rule || !Array.isArray(rule.actions)) {
                 return;
             }
             rule.actions.push({ target: '', intent: 'visible:true' });
         },
 
-        removeRuleAction(rule, actionIndex) {
+        removeRuleAction(rule: DecisionTableRule, actionIndex: number): void {
             if (!rule || !Array.isArray(rule.actions) || rule.actions.length <= 1) {
                 return;
             }
@@ -219,7 +319,7 @@
             rule.actions.splice(actionIndex, 1);
         },
 
-        ensureRuleRowDefaults(rule) {
+        ensureRuleRowDefaults(rule: DecisionTableRule): void {
             if (!rule) {
                 return;
             }
@@ -257,7 +357,7 @@
                 rule.decisionActions = {};
             }
 
-            this.decisionInputColumns.forEach((column) => {
+            this.decisionInputColumns.forEach((column: DecisionInputColumn) => {
                 if (rule.decisionInputs[column.id] === undefined) {
                     rule.decisionInputs[column.id] = { op: 'eq', value: '' };
                     return;
@@ -272,28 +372,28 @@
                     rule.decisionInputs[column.id].op = 'eq';
                 }
             });
-            this.decisionActionColumns.forEach((column) => {
+            this.decisionActionColumns.forEach((column: DecisionActionColumn) => {
                 if (rule.decisionActions[column.id] === undefined) {
                     rule.decisionActions[column.id] = '';
                 }
             });
         },
 
-        primaryCondition(rule) {
+        primaryCondition(rule: DecisionTableRule): RuleCondition {
             this.ensureRuleRowDefaults(rule);
             return rule.conditions[0];
         },
 
-        primaryAction(rule) {
+        primaryAction(rule: DecisionTableRule): RuleAction {
             this.ensureRuleRowDefaults(rule);
             return rule.actions[0];
         },
 
-        isSetMembershipOperator(op) {
+        isSetMembershipOperator(op: string): boolean {
             return op === 'in' || op === 'notIn';
         },
 
-        newDecisionInputColumn(stateKey = '') {
+        newDecisionInputColumn(stateKey: string = ''): DecisionInputColumn {
             const next = this.nextDecisionColumnSeq;
             this.nextDecisionColumnSeq += 1;
             return {
@@ -302,7 +402,7 @@
             };
         },
 
-        newDecisionActionColumn(target = '', property = 'visible') {
+        newDecisionActionColumn(target: string = '', property: string = 'visible'): DecisionActionColumn {
             const config = (target && typeof target === 'object' && !Array.isArray(target))
                 ? target
                 : { target, property };
@@ -311,7 +411,7 @@
             return {
                 id: `out-${next}`,
                 kind: (() => {
-                    const raw = String(config.kind || 'ui').trim().toLowerCase();
+                    const raw = String((config as any).kind || 'ui').trim().toLowerCase();
                     if (raw === 'api') {
                         return 'api';
                     }
@@ -320,20 +420,20 @@
                     }
                     return 'ui';
                 })(),
-                target: String(config.target || '').trim(),
-                property: String(config.property || 'visible').trim() || 'visible',
-                apiEndpoint: String(config.apiEndpoint || '').trim(),
-                apiMethod: String(config.apiMethod || 'get').trim().toLowerCase() || 'get',
-                apiTrigger: String(config.apiTrigger || 'change').trim().toLowerCase() || 'change',
-                apiTarget: String(config.apiTarget || '').trim(),
-                apiSwap: String(config.apiSwap || 'innerHTML').trim() || 'innerHTML',
-                apiValsTemplate: String(config.apiValsTemplate || '').trim(),
-                deriveTarget: String(config.deriveTarget || config.target || '').trim(),
-                deriveExpression: String(config.deriveExpression || '').trim()
+                target: String((config as any).target || '').trim(),
+                property: String((config as any).property || 'visible').trim() || 'visible',
+                apiEndpoint: String((config as any).apiEndpoint || '').trim(),
+                apiMethod: String((config as any).apiMethod || 'get').trim().toLowerCase() || 'get',
+                apiTrigger: String((config as any).apiTrigger || 'change').trim().toLowerCase() || 'change',
+                apiTarget: String((config as any).apiTarget || '').trim(),
+                apiSwap: String((config as any).apiSwap || 'innerHTML').trim() || 'innerHTML',
+                apiValsTemplate: String((config as any).apiValsTemplate || '').trim(),
+                deriveTarget: String((config as any).deriveTarget || (config as any).target || '').trim(),
+                deriveExpression: String((config as any).deriveExpression || '').trim()
             };
         },
 
-        ensureDecisionTableSchema() {
+        ensureDecisionTableSchema(): void {
             if (!Array.isArray(this.decisionInputColumns)) {
                 this.decisionInputColumns = [];
             }
@@ -350,40 +450,40 @@
             }
         },
 
-        addDecisionInputColumn() {
+        addDecisionInputColumn(): void {
             this.ensureDecisionTableSchema();
             const column = this.newDecisionInputColumn('');
             this.decisionInputColumns.push(column);
-            this.rules.forEach((rule) => {
+            this.rules.forEach((rule: DecisionTableRule) => {
                 this.ensureRuleRowDefaults(rule);
                 rule.decisionInputs[column.id] = { op: 'eq', value: '' };
             });
         },
 
-        insertDecisionInputColumnAfter(columnId) {
+        insertDecisionInputColumnAfter(columnId: string): void {
             this.ensureDecisionTableSchema();
             const column = this.newDecisionInputColumn('');
-            const index = this.decisionInputColumns.findIndex((item) => item.id === columnId);
+            const index = this.decisionInputColumns.findIndex((item: DecisionInputColumn) => item.id === columnId);
             if (index < 0) {
                 this.decisionInputColumns.push(column);
             } else {
                 this.decisionInputColumns.splice(index + 1, 0, column);
             }
-            this.rules.forEach((rule) => {
+            this.rules.forEach((rule: DecisionTableRule) => {
                 this.ensureRuleRowDefaults(rule);
                 rule.decisionInputs[column.id] = { op: 'eq', value: '' };
             });
         },
 
-        removeDecisionInputColumn(columnId) {
+        removeDecisionInputColumn(columnId: string): void {
             if (!columnId || this.decisionInputColumns.length <= 1) {
                 return;
             }
-            const index = this.decisionInputColumns.findIndex((column) => column.id === columnId);
+            const index = this.decisionInputColumns.findIndex((column: DecisionInputColumn) => column.id === columnId);
             if (index >= 0) {
                 this.decisionInputColumns.splice(index, 1);
             }
-            this.rules.forEach((rule) => {
+            this.rules.forEach((rule: DecisionTableRule) => {
                 if (rule && rule.decisionInputs && Object.prototype.hasOwnProperty.call(rule.decisionInputs, columnId)) {
                     delete rule.decisionInputs[columnId];
                 }
@@ -391,40 +491,40 @@
             this.syncCurrentDecisionTable();
         },
 
-        addDecisionActionColumn() {
+        addDecisionActionColumn(): void {
             this.ensureDecisionTableSchema();
             const column = this.newDecisionActionColumn('', 'visible');
             this.decisionActionColumns.push(column);
-            this.rules.forEach((rule) => {
+            this.rules.forEach((rule: DecisionTableRule) => {
                 this.ensureRuleRowDefaults(rule);
                 rule.decisionActions[column.id] = '';
             });
         },
 
-        insertDecisionActionColumnAfter(columnId) {
+        insertDecisionActionColumnAfter(columnId: string): void {
             this.ensureDecisionTableSchema();
             const column = this.newDecisionActionColumn('', 'visible');
-            const index = this.decisionActionColumns.findIndex((item) => item.id === columnId);
+            const index = this.decisionActionColumns.findIndex((item: DecisionActionColumn) => item.id === columnId);
             if (index < 0) {
                 this.decisionActionColumns.push(column);
             } else {
                 this.decisionActionColumns.splice(index + 1, 0, column);
             }
-            this.rules.forEach((rule) => {
+            this.rules.forEach((rule: DecisionTableRule) => {
                 this.ensureRuleRowDefaults(rule);
                 rule.decisionActions[column.id] = '';
             });
         },
 
-        removeDecisionActionColumn(columnId) {
+        removeDecisionActionColumn(columnId: string): void {
             if (!columnId || this.decisionActionColumns.length <= 1) {
                 return;
             }
-            const index = this.decisionActionColumns.findIndex((column) => column.id === columnId);
+            const index = this.decisionActionColumns.findIndex((column: DecisionActionColumn) => column.id === columnId);
             if (index >= 0) {
                 this.decisionActionColumns.splice(index, 1);
             }
-            this.rules.forEach((rule) => {
+            this.rules.forEach((rule: DecisionTableRule) => {
                 if (rule && rule.decisionActions && Object.prototype.hasOwnProperty.call(rule.decisionActions, columnId)) {
                     delete rule.decisionActions[columnId];
                 }
@@ -432,35 +532,34 @@
             this.syncCurrentDecisionTable();
         },
 
-        decisionInputCell(rule, columnId) {
+        decisionInputCell(rule: DecisionTableRule, columnId: string): string {
             this.ensureRuleRowDefaults(rule);
             return String(rule.decisionInputs[columnId]?.value || '');
         },
 
-        setDecisionInputCell(rule, columnId, value) {
+        setDecisionInputCell(rule: DecisionTableRule, columnId: string, value: string): void {
             this.ensureRuleRowDefaults(rule);
             const cell = rule.decisionInputs[columnId] || { op: 'eq', value: '' };
             cell.value = String(value || '');
             rule.decisionInputs[columnId] = cell;
         },
 
-        decisionInputOperator(rule, columnId) {
+        decisionInputOperator(rule: DecisionTableRule, columnId: string): string {
             this.ensureRuleRowDefaults(rule);
             return String(rule.decisionInputs[columnId]?.op || 'eq');
         },
 
-        setDecisionInputOperator(rule, columnId, op) {
+        setDecisionInputOperator(rule: DecisionTableRule, columnId: string, op: string): void {
             this.ensureRuleRowDefaults(rule);
             const cell = rule.decisionInputs[columnId] || { op: 'eq', value: '' };
             cell.op = String(op || 'eq').trim() || 'eq';
             if (cell.op === 'exists') {
-                // Treat "exists" as an explicit enabled predicate for compile logic.
                 cell.value = 'true';
             }
             rule.decisionInputs[columnId] = cell;
         },
 
-        operatorOptionsForInputColumn(column) {
+        operatorOptionsForInputColumn(column: DecisionInputColumn): OperatorOption[] {
             const type = this.ruleInputColumnType(column);
             if (type === 'boolean') {
                 return [
@@ -492,15 +591,15 @@
             ];
         },
 
-        ruleInputColumnMeta(column) {
+        ruleInputColumnMeta(column: DecisionInputColumn): StateKeyOption | null {
             const key = String(column?.stateKey || '').trim();
             if (!key) {
                 return null;
             }
-            return this.availableStateKeyOptions().find((item) => item.key === key) || null;
+            return this.availableStateKeyOptions().find((item: StateKeyOption) => item.key === key) || null;
         },
 
-        ruleInputColumnType(column) {
+        ruleInputColumnType(column: DecisionInputColumn): string {
             const meta = this.ruleInputColumnMeta(column);
             if (!meta) {
                 return 'string';
@@ -511,7 +610,7 @@
             return 'string';
         },
 
-        inputCellValueInputType(rule, columnId, column) {
+        inputCellValueInputType(rule: DecisionTableRule, columnId: string, column: DecisionInputColumn): string {
             const op = this.decisionInputOperator(rule, columnId);
             if (op === 'exists') {
                 return 'none';
@@ -525,18 +624,18 @@
             return 'text';
         },
 
-        decisionMatrixGridStyle() {
+        decisionMatrixGridStyle(): string {
             const inputCount = Math.max(1, Array.isArray(this.decisionInputColumns) ? this.decisionInputColumns.length : 0);
             const actionCount = Math.max(1, Array.isArray(this.decisionActionColumns) ? this.decisionActionColumns.length : 0);
             return `grid-template-columns: 64px repeat(${inputCount}, minmax(220px, 1fr)) repeat(${actionCount}, minmax(180px, 1fr)) 120px;`;
         },
 
-        decisionActionCell(rule, columnId) {
+        decisionActionCell(rule: DecisionTableRule, columnId: string): string {
             this.ensureRuleRowDefaults(rule);
             return String(rule.decisionActions[columnId] || '');
         },
 
-        setDecisionActionCell(rule, columnId, value) {
+        setDecisionActionCell(rule: DecisionTableRule, columnId: string, value: string): void {
             this.ensureRuleRowDefaults(rule);
             const raw = String(value || '').trim().toLowerCase();
             if (raw === 'true' || raw === 'false') {
@@ -544,6 +643,18 @@
                 return;
             }
             rule.decisionActions[columnId] = '';
+        },
+
+        availableStateKeys(): string[] {
+            // Placeholder - will be implemented by mixin
+            return [];
+        },
+
+        availableStateKeyOptions(): StateKeyOption[] {
+            // Placeholder - will be implemented by mixin
+            return [];
         }
     };
+
+    windowAny.formDesignerRulesTable = api;
 }(window));

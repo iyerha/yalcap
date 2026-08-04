@@ -1,16 +1,113 @@
-// @ts-check
 (function () {
-    const windowAny = /** @type {any} */ (window);
+    const windowAny = window as any;
 
-    const coreInteractionsApi = /** @type {Record<string, any>} */ ({
-        newControlLocalId() {
+    interface FormControl {
+        widget: string;
+        stateKey?: string;
+        name?: string;
+        label?: string;
+        localId?: string;
+        defaultValue?: any;
+        children?: FormControl[];
+        options?: ControlOption[];
+        autocompleteSourceType?: string;
+        autocompleteSourceUrl?: string;
+        autocompleteLabelField?: string;
+        autocompleteValueField?: string;
+        autocompleteSearchParam?: string;
+        minDate?: string;
+        maxDate?: string;
+        minDateTime?: string;
+        maxDateTime?: string;
+        assetKey?: string;
+        assetVersion?: number;
+        assetHash?: string;
+        assetPreviewUrl?: string;
+        altText?: string;
+        objectFit?: string;
+        imageWidth?: number;
+        imageHeight?: number;
+        uploadAccept?: string;
+        uploadAllowMultiple?: boolean;
+        uploadMaxBytes?: number;
+        buttonVariant?: string;
+        buttonActionType?: string;
+        buttonActionTarget?: string;
+        buttonPayload?: string;
+        buttonConfirmMessage?: string;
+        messageTone?: string;
+        messageTitle?: string;
+        messageBody?: string;
+        messageFormat?: string;
+        repeatRenderer?: string;
+        repeatMinItems?: number;
+        repeatMaxItems?: number;
+        repeatAllowAdd?: boolean;
+        repeatAllowDelete?: boolean;
+        repeatAllowReorder?: boolean;
+        tableColumns?: TableColumn[];
+        tableMinItems?: number;
+        tableMaxItems?: number;
+        tableAllowAdd?: boolean;
+        tableAllowDelete?: boolean;
+        tableAllowReorder?: boolean;
+        sectionDescription?: string;
+        sectionCollapsible?: boolean;
+        sectionDefaultExpanded?: boolean;
+        groupDescription?: string;
+        nameManual?: boolean;
+        type?: string;
+        required?: boolean;
+        visible?: boolean;
+        enabled?: boolean;
+        validationMessage?: string;
+        hint?: string;
+        hintFormat?: string;
+        help?: string;
+        helpFormat?: string;
+        colSpan?: number;
+        placeholder?: string;
+        id?: string;
+        [key: string]: any;
+    }
+
+    interface ControlOption {
+        label: string;
+        value: string;
+        autoValue?: boolean;
+    }
+
+    interface TableColumn {
+        key: string;
+        title: string;
+        type: string;
+        required: boolean;
+    }
+
+    interface ControlRef {
+        control: FormControl;
+        index: number;
+        list: FormControl[];
+        parent: FormControl | null;
+    }
+
+    const coreInteractionsApi: Record<string, any> = {
+        nextControlSeq: 0,
+        controls: [] as FormControl[],
+        selectedControlLocalId: null as string | null,
+        selectedControl: null as FormControl | null,
+        validationErrors: [] as string[],
+        stateKeyEditEnabled: false,
+        lastSelectedAt: 0,
+        controlPalette: [] as any[],
+
+        newControlLocalId(): string {
             const seq = this.nextControlSeq;
             this.nextControlSeq += 1;
             return `ctrl-${Date.now()}-${seq}`;
         },
 
-        /** @param {number | null | undefined} index */
-        createControlFromPalette(index) {
+        createControlFromPalette(index: number | null | undefined): FormControl | null {
             if (index === null || index === undefined) {
                 return null;
             }
@@ -93,8 +190,7 @@
             };
         },
 
-        /** @param {string} widget */
-        defaultInitialValueForWidget(widget) {
+        defaultInitialValueForWidget(widget: string): any {
             if (widget === 'checkbox') {
                 return [];
             }
@@ -110,8 +206,7 @@
             return '';
         },
 
-        /** @param {string} localId @param {Array<any>=} list @param {any=} parent */
-        findControlByLocalId(localId, list = undefined, parent = null) {
+        findControlByLocalId(localId: string, list?: FormControl[], parent: FormControl | null = null): ControlRef | null {
             const items = Array.isArray(list) ? list : this.controls;
             for (let i = 0; i < items.length; i += 1) {
                 const control = items[i];
@@ -128,20 +223,17 @@
             return null;
         },
 
-        /** @param {string} widget */
-        isContainerWidget(widget) {
+        isContainerWidget(widget: string): boolean {
             return widget === 'section' || widget === 'group' || widget === 'repeat';
         },
 
-        /** @param {string} containerId @param {string} possibleDescendantId */
-        isDescendantId(containerId, possibleDescendantId) {
+        isDescendantId(containerId: string, possibleDescendantId: string): boolean {
             const containerRef = this.findControlByLocalId(containerId);
             if (!containerRef || !Array.isArray(containerRef.control.children)) {
                 return false;
             }
 
-            /** @param {Array<any>} children */
-            const walk = (children) => {
+            const walk = (children: FormControl[]): boolean => {
                 for (let i = 0; i < children.length; i += 1) {
                     const child = children[i];
                     if (child.localId === possibleDescendantId) {
@@ -157,8 +249,7 @@
             return walk(containerRef.control.children);
         },
 
-        /** @param {string} localId */
-        detachControl(localId) {
+        detachControl(localId: string): FormControl | null {
             const found = this.findControlByLocalId(localId);
             if (!found) {
                 return null;
@@ -166,17 +257,16 @@
             return found.list.splice(found.index, 1)[0];
         },
 
-        /** @param {string | null} localId */
-        selectControl(localId) {
+        selectControl(localId: string | null): void {
             this.selectedControlLocalId = localId;
             this.lastSelectedAt = Date.now();
             this.stateKeyEditEnabled = false;
-            const found = this.findControlByLocalId(localId);
+            const found = this.findControlByLocalId(localId!);
             this.selectedControl = found ? this.normalizeControl(found.control) : null;
             this.validateSelected();
         },
 
-        clearSelection() {
+        clearSelection(): void {
             this.selectedControlLocalId = null;
             this.selectedControl = null;
             this.stateKeyEditEnabled = false;
@@ -184,19 +274,18 @@
             this.validationErrors = [];
         },
 
-        /** @param {string} localId @param {(control: any) => void} mutator */
-        updateCanvasControl(localId, mutator) {
+        updateCanvasControl(localId: string, mutator: (control: FormControl) => void): void {
             const found = this.findControlByLocalId(localId);
             if (!found) {
                 return;
             }
 
             const source = found.control || {};
-            const draft = {
+            const draft: FormControl = {
                 ...source,
-                options: Array.isArray(source.options) ? source.options.map((/** @type {any} */ o) => ({ ...o })) : [],
-                tableColumns: Array.isArray(source.tableColumns) ? source.tableColumns.map((/** @type {any} */ col) => ({ ...col })) : [],
-                children: Array.isArray(source.children) ? source.children.map((/** @type {any} */ child) => ({ ...child })) : []
+                options: Array.isArray(source.options) ? source.options.map((o: ControlOption) => ({ ...o })) : [],
+                tableColumns: Array.isArray(source.tableColumns) ? source.tableColumns.map((col: TableColumn) => ({ ...col })) : [],
+                children: Array.isArray(source.children) ? source.children.map((child: FormControl) => ({ ...child })) : []
             };
 
             mutator(draft);
@@ -206,17 +295,15 @@
             if (this.selectedControlLocalId === localId) {
                 this.selectedControl = {
                     ...normalized,
-                    options: Array.isArray(normalized.options) ? normalized.options.map((/** @type {any} */ o) => ({ ...o })) : [],
-                    tableColumns: Array.isArray(normalized.tableColumns) ? normalized.tableColumns.map((/** @type {any} */ col) => ({ ...col })) : []
+                    options: Array.isArray(normalized.options) ? normalized.options.map((o: ControlOption) => ({ ...o })) : [],
+                    tableColumns: Array.isArray(normalized.tableColumns) ? normalized.tableColumns.map((col: TableColumn) => ({ ...col })) : []
                 };
                 this.validateSelected();
             }
         },
 
-        /** @param {string} controlId @param {string} value */
-        onCanvasLabelChanged(controlId, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasLabelChanged(controlId: string, value: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 control.label = value;
                 if (!control.nameManual) {
                     control.name = this.toIdentifier(value);
@@ -224,26 +311,20 @@
             });
         },
 
-        /** @param {string} controlId @param {string} value */
-        onCanvasImageAltChanged(controlId, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasImageAltChanged(controlId: string, value: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 control.altText = value;
             });
         },
 
-        /** @param {string} controlId @param {string} value */
-        onCanvasDefaultTextChanged(controlId, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasDefaultTextChanged(controlId: string, value: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 control.defaultValue = value;
             });
         },
 
-        /** @param {string} controlId @param {string | number | null | undefined} value */
-        onCanvasDefaultNumberChanged(controlId, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasDefaultNumberChanged(controlId: string, value: string | number | null | undefined): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 if (value === '' || value === null || value === undefined) {
                     control.defaultValue = null;
                     return;
@@ -254,18 +335,14 @@
             });
         },
 
-        /** @param {string} controlId @param {boolean} checked */
-        onCanvasDefaultBooleanChanged(controlId, checked) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasDefaultBooleanChanged(controlId: string, checked: boolean): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 control.defaultValue = checked === true;
             });
         },
 
-        /** @param {string} controlId @param {string} optionValue @param {boolean} checked */
-        onCanvasDefaultMultiChanged(controlId, optionValue, checked) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasDefaultMultiChanged(controlId: string, optionValue: string, checked: boolean): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 const values = Array.isArray(control.defaultValue)
                     ? [...control.defaultValue]
                     : [];
@@ -283,14 +360,12 @@
             });
         },
 
-        /** @param {string} controlId @param {string} value @param {boolean} allowMultiple */
-        onCanvasUploadDefaultChanged(controlId, value, allowMultiple) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasUploadDefaultChanged(controlId: string, value: string, allowMultiple: boolean): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 if (allowMultiple === true) {
                     control.defaultValue = (value || '')
                         .split(',')
-                        .map((/** @type {string} */ entry) => entry.trim())
+                        .map((entry: string) => entry.trim())
                         .filter(Boolean);
                     return;
                 }
@@ -299,36 +374,31 @@
             });
         },
 
-        /** @param {string} controlId @param {string} value */
-        onCanvasUploadAcceptChanged(controlId, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasUploadAcceptChanged(controlId: string, value: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 control.uploadAccept = value;
             });
         },
 
-        /** @param {string} controlId @param {string | number} value */
-        onCanvasUploadMaxBytesChanged(controlId, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasUploadMaxBytesChanged(controlId: string, value: string | number): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 const parsed = Number(value) || 0;
                 control.uploadMaxBytes = parsed < 0 ? 0 : parsed;
             });
         },
 
-        /** @param {Event} event */
-        async uploadImageAsset(event) {
+        async uploadImageAsset(event: Event): Promise<void> {
             if (!this.selectedControl || this.selectedControl.widget !== 'image') {
                 return;
             }
 
-            const input = /** @type {HTMLInputElement | null} */ (event && event.target ? event.target : null);
+            const input = event && event.target ? (event.target as HTMLInputElement) : null;
             const file = input && input.files && input.files[0] ? input.files[0] : null;
             if (!file) {
                 return;
             }
 
-            const previewUrl = await new Promise((resolve, reject) => {
+            const previewUrl = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result ? String(reader.result) : '');
                 reader.onerror = () => reject(new Error('Unable to read image preview'));
@@ -374,10 +444,8 @@
             }
         },
 
-        /** @param {string} controlId @param {number} columnIndex @param {string} value */
-        onCanvasTableColumnTitleChanged(controlId, columnIndex, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasTableColumnTitleChanged(controlId: string, columnIndex: number, value: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 if (!Array.isArray(control.tableColumns) || !control.tableColumns[columnIndex]) {
                     return;
                 }
@@ -385,10 +453,8 @@
             });
         },
 
-        /** @param {string} controlId @param {number} columnIndex @param {string} value */
-        onCanvasTableColumnTypeChanged(controlId, columnIndex, value) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        onCanvasTableColumnTypeChanged(controlId: string, columnIndex: number, value: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 if (!Array.isArray(control.tableColumns) || !control.tableColumns[columnIndex]) {
                     return;
                 }
@@ -396,15 +462,13 @@
             });
         },
 
-        /** @param {string} controlId */
-        addTableColumnOnCanvas(controlId) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        addTableColumnOnCanvas(controlId: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 if (!Array.isArray(control.tableColumns)) {
                     control.tableColumns = [];
                 }
 
-                const existingKeys = new Set(control.tableColumns.map((/** @type {any} */ col) => col.key));
+                const existingKeys = new Set(control.tableColumns.map((col: TableColumn) => col.key));
                 let next = control.tableColumns.length + 1;
                 let nextKey = `column${next}`;
                 while (existingKeys.has(nextKey)) {
@@ -421,17 +485,15 @@
             });
         },
 
-        /** @param {string} controlId */
-        removeLastTableColumnOnCanvas(controlId) {
-            /** @param {any} control */
-            this.updateCanvasControl(controlId, (control) => {
+        removeLastTableColumnOnCanvas(controlId: string): void {
+            this.updateCanvasControl(controlId, (control: FormControl) => {
                 if (!Array.isArray(control.tableColumns) || control.tableColumns.length <= 1) {
                     return;
                 }
                 control.tableColumns.pop();
             });
         }
-    });
+    };
 
     windowAny.formDesignerInteractionsCore = coreInteractionsApi;
 })();

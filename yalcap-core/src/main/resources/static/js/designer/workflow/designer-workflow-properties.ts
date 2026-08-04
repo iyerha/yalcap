@@ -1,10 +1,125 @@
-window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixin(target) {
+// @ts-check
+
+interface ConfigField {
+    key: string;
+    title: string;
+    type: string;
+    format: string;
+    placeholder: string;
+    enumValues: string[];
+}
+
+interface ConfigSchema {
+    properties?: Record<string, any>;
+}
+
+interface StepTypeDescriptor {
+    configSchema?: ConfigSchema;
+    displayName?: string;
+    [key: string]: unknown;
+}
+
+interface WorkflowStepHookRegistry {
+    [key: string]: WorkflowStepHook;
+}
+
+interface WorkflowDesignerPropertiesApi {
+    selectedStepDraft: any;
+    selectedStepHint: string;
+    configFieldErrors: Record<string, string>;
+    activeStepHookKeys: string[];
+    selectedNodeId: string | null;
+    propertiesCollapsed: boolean;
+    useFallbackCanvas: boolean;
+    editor: any;
+    steps: any[];
+    definitionJson: string;
+
+    refreshSelectedStepView: () => void;
+    normalizeNodeId: (nodeId: any) => string;
+    selectWorkflowNode: (nodeId: string) => void;
+    findSelectedStep: (selectedId: string) => any;
+    togglePropertiesCollapsed: () => void;
+    getSelectedStepConfigFields: () => ConfigField[];
+    getSelectedStepOutputCount: () => number;
+    getSelectedStepOutputIndices: () => number[];
+    getSelectedStepConfigValue: (key: string) => string;
+    normalizeJsonConfig: (text: string) => any;
+    updateSelectedStepConfig: (field: ConfigField, value: unknown) => void;
+    getStepHook: (type: string) => WorkflowStepHook | null;
+    applyStepHookBindings: (stepType: string) => void;
+    getStepTypeFieldValue: (fieldName: string) => string;
+    updateStepTypeField: (fieldName: string, value: unknown) => void;
+    getAllCustomFields: () => any[];
+    getFieldValue: (section: string, fieldKey: string) => string;
+    updateFieldValue: (section: string, fieldKey: string, value: unknown) => void;
+    syncSelectedStep: () => void;
+    removeSelectedNode: () => void;
+    getStepTypeDescriptor: (type: string) => StepTypeDescriptor | null;
+    getStepTypeOutputCount: (type: string) => number;
+    getStepTypeConfigDefaults: (type: string) => Record<string, unknown>;
+    invokeStepHook: (type: string, hookName: string, context: any) => void;
+    getGraphNode: (nodeId: any) => any;
+    getGraphNodeByStepId: (stepId: string) => any;
+    getWorkflowNodeClass: (step: any) => string;
+    renderNodeTemplate: (step: any) => string;
+    generate: () => void;
+    renderGraphFromSteps: () => void;
+    renderFallbackCanvas: () => void;
+    syncTransitionsFromGraph: () => void;
+    refreshIndexConfig?: () => void;
+}
+
+(window as any).workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixin(target: any): void {
     Object.assign(target, {
         selectedStepDraft: null,
         selectedStepHint: '',
         configFieldErrors: {},
+        activeStepHookKeys: [] as string[],
 
-        refreshSelectedStepView() {
+        applyStepHookBindings(this: any, stepType: string): void {
+            const previousKeys = Array.isArray(this.activeStepHookKeys) ? this.activeStepHookKeys : [];
+            for (let i = 0; i < previousKeys.length; i += 1) {
+                const key = previousKeys[i];
+                if (key && Object.prototype.hasOwnProperty.call(this, key)) {
+                    delete this[key];
+                }
+            }
+
+            this.activeStepHookKeys = [];
+            const hook = this.getStepHook(stepType);
+            if (!hook || typeof hook !== 'object') {
+                return;
+            }
+
+            const reservedKeys = new Set(['customFields', 'onSelect', 'afterSync']);
+            const nextKeys: string[] = [];
+
+            Object.keys(hook).forEach((key: string) => {
+                if (reservedKeys.has(key)) {
+                    return;
+                }
+
+                const value = (hook as any)[key];
+                if (typeof value === 'function') {
+                    this[key] = value.bind(this);
+                } else if (Array.isArray(value)) {
+                    this[key] = value.map((item: any) =>
+                        item && typeof item === 'object' ? JSON.parse(JSON.stringify(item)) : item
+                    );
+                } else if (value && typeof value === 'object') {
+                    this[key] = JSON.parse(JSON.stringify(value));
+                } else {
+                    this[key] = value;
+                }
+
+                nextKeys.push(key);
+            });
+
+            this.activeStepHookKeys = nextKeys;
+        },
+
+        refreshSelectedStepView(this: any): void {
             const selectedId = String(this.selectedNodeId || '').trim();
             if (!selectedId) {
                 this.selectedStepDraft = null;
@@ -15,23 +130,28 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             const sourceStep = this.findSelectedStep(selectedId);
             this.selectedStepHint = '';
             this.configFieldErrors = {};
-            this.selectedStepDraft = sourceStep ? {
-                id: sourceStep.id,
-                title: sourceStep.title,
-                type: sourceStep.type,
-                config: JSON.parse(JSON.stringify(sourceStep.config || {})),
-                ui: JSON.parse(JSON.stringify({
-                    designer: { position: { x: 0, y: 0 } }
-                })),
-                routing: JSON.parse(JSON.stringify(sourceStep.routing || { transitions: {} })),
-                nodeId: sourceStep.nodeId
-            } : null;
+            this.selectedStepDraft = sourceStep
+                ? {
+                    id: sourceStep.id,
+                    title: sourceStep.title,
+                    type: sourceStep.type,
+                    config: JSON.parse(JSON.stringify(sourceStep.config || {})),
+                    ui: JSON.parse(
+                        JSON.stringify({
+                            designer: { position: { x: 0, y: 0 } }
+                        })
+                    ),
+                    routing: JSON.parse(JSON.stringify(sourceStep.routing || { transitions: {} })),
+                    nodeId: sourceStep.nodeId
+                }
+                : null;
 
             if (this.selectedStepDraft) {
+                this.applyStepHookBindings(this.selectedStepDraft.type);
                 this.invokeStepHook(this.selectedStepDraft.type, 'onSelect', {
                     step: sourceStep,
                     draft: this.selectedStepDraft,
-                    setHint: (hint) => {
+                    setHint: (hint: string) => {
                         this.selectedStepHint = String(hint || '').trim();
                     },
                     sync: () => this.syncSelectedStep()
@@ -43,11 +163,11 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             }
         },
 
-        normalizeNodeId(nodeId) {
+        normalizeNodeId(this: any, nodeId: any): string {
             return String(nodeId || '').replace(/^node-/, '').trim();
         },
 
-        selectWorkflowNode(nodeId) {
+        selectWorkflowNode(this: any, nodeId: string): void {
             const normalizedNodeId = this.normalizeNodeId(nodeId);
             if (!normalizedNodeId) {
                 return;
@@ -56,34 +176,38 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             this.refreshSelectedStepView();
         },
 
-        findSelectedStep(selectedId) {
+        findSelectedStep(this: any, selectedId: string): any {
             const normalizedSelectedId = this.normalizeNodeId(selectedId);
             const graphNode = this.getGraphNode(normalizedSelectedId);
             const graphStepId = graphNode && graphNode.data ? String(graphNode.data.stepId || '').trim() : '';
 
-            return this.steps.find((step) => {
-                if (graphStepId && String(step.id) === graphStepId) {
-                    return true;
-                }
-                return this.normalizeNodeId(step.nodeId) === normalizedSelectedId || String(step.id) === String(selectedId);
-            }) || null;
+            return (
+                this.steps.find((step: any) => {
+                    if (graphStepId && String(step.id) === graphStepId) {
+                        return true;
+                    }
+                    return (
+                        this.normalizeNodeId(step.nodeId) === normalizedSelectedId || String(step.id) === String(selectedId)
+                    );
+                }) || null
+            );
         },
 
-        togglePropertiesCollapsed() {
+        togglePropertiesCollapsed(this: any): void {
             this.propertiesCollapsed = !this.propertiesCollapsed;
         },
 
-        getSelectedStepConfigFields() {
+        getSelectedStepConfigFields(this: any): ConfigField[] {
             const selectedType = this.selectedStepDraft ? this.selectedStepDraft.type : null;
             const descriptor = this.getStepTypeDescriptor(selectedType);
-            const schema = descriptor && descriptor.configSchema && typeof descriptor.configSchema === 'object'
-                ? descriptor.configSchema
-                : {};
-            const properties = schema && schema.properties && typeof schema.properties === 'object'
-                ? schema.properties
-                : {};
+            const schema =
+                descriptor && descriptor.configSchema && typeof descriptor.configSchema === 'object'
+                    ? descriptor.configSchema
+                    : {};
+            const properties =
+                schema && schema.properties && typeof schema.properties === 'object' ? schema.properties : {};
 
-            return Object.keys(properties).map((key) => {
+            return Object.keys(properties).map((key: string) => {
                 const raw = properties[key] || {};
                 return {
                     key: key,
@@ -91,24 +215,24 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
                     type: String(raw.type || 'string'),
                     format: String(raw.format || '').trim(),
                     placeholder: String(raw.placeholder || '').trim(),
-                    enumValues: Array.isArray(raw.enum) ? raw.enum.map((value) => String(value)) : []
+                    enumValues: Array.isArray(raw.enum) ? raw.enum.map((value: any) => String(value)) : []
                 };
             });
         },
 
-        getSelectedStepOutputCount() {
+        getSelectedStepOutputCount(this: any): number {
             const selectedType = this.selectedStepDraft ? this.selectedStepDraft.type : null;
             return this.getStepTypeOutputCount(selectedType);
         },
 
-        getSelectedStepOutputIndices() {
+        getSelectedStepOutputIndices(this: any): number[] {
             const outputCount = this.getSelectedStepOutputCount();
-            return Array.from({ length: outputCount }, function (_, index) {
+            return Array.from({ length: outputCount }, function (_, index: number) {
                 return index + 1;
             });
         },
 
-        getSelectedStepConfigValue(key) {
+        getSelectedStepConfigValue(this: any, key: string): string {
             if (!this.selectedStepDraft || !this.selectedStepDraft.config) {
                 return '';
             }
@@ -116,7 +240,7 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             return value == null ? '' : String(value);
         },
 
-        normalizeJsonConfig(text) {
+        normalizeJsonConfig(this: any, text: string): any {
             const trimmed = String(text || '').trim();
             if (!trimmed) {
                 return null;
@@ -129,12 +253,12 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             return parsed;
         },
 
-        updateSelectedStepConfig(field, value) {
+        updateSelectedStepConfig(this: any, field: ConfigField, value: unknown): void {
             if (!this.selectedStepDraft) {
                 return;
             }
 
-            const key = String(field && field.key || '').trim();
+            const key = String((field && field.key) || '').trim();
             if (!key) {
                 return;
             }
@@ -146,11 +270,11 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             const rawValue = value == null ? '' : String(value);
             this.selectedStepDraft.config[key] = rawValue;
 
-            if (String(field && field.format || '').trim() === 'json') {
+            if (String((field && field.format) || '').trim() === 'json') {
                 try {
                     this.normalizeJsonConfig(rawValue);
                     delete this.configFieldErrors[key];
-                } catch (err) {
+                } catch (err: unknown) {
                     this.configFieldErrors[key] = err instanceof Error ? err.message : String(err);
                 }
             } else {
@@ -160,22 +284,22 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             this.syncSelectedStep();
         },
 
-        getStepHook(type) {
+        getStepHook(this: any, type: string): WorkflowStepHook | null {
             if (!type) return null;
             const key = String(type || '').trim().toLowerCase();
-            const hooks = window.workflowStepHooks || {};
+            const hooks: WorkflowStepHookRegistry = (window as any).workflowStepHooks || {};
             return hooks[key] || null;
         },
 
-        getStepTypeFieldValue(fieldName) {
+        getStepTypeFieldValue(this: any, fieldName: string): string {
             if (!this.selectedStepDraft) {
                 return '';
             }
             const value = this.selectedStepDraft[fieldName];
-            return value == null ? '' : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+            return value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
         },
 
-        updateStepTypeField(fieldName, value) {
+        updateStepTypeField(this: any, fieldName: string, value: unknown): void {
             if (!this.selectedStepDraft) {
                 return;
             }
@@ -183,19 +307,19 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             this.syncSelectedStep();
         },
 
-        getAllCustomFields() {
+        getAllCustomFields(this: any): any[] {
             if (!this.selectedStepDraft) return [];
             const hook = this.getStepHook(this.selectedStepDraft.type);
-            return (hook && Array.isArray(hook.customFields)) ? hook.customFields : [];
+            return hook && Array.isArray(hook.customFields) ? hook.customFields : [];
         },
 
-        getFieldValue(section, fieldKey) {
+        getFieldValue(this: any, section: string, fieldKey: string): string {
             if (!this.selectedStepDraft || !this.selectedStepDraft[section]) return '';
             const value = this.selectedStepDraft[section][fieldKey];
             return value == null ? '' : String(value);
         },
 
-        updateFieldValue(section, fieldKey, value) {
+        updateFieldValue(this: any, section: string, fieldKey: string, value: unknown): void {
             if (!this.selectedStepDraft) return;
             if (!this.selectedStepDraft[section]) {
                 this.selectedStepDraft[section] = {};
@@ -211,7 +335,7 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             }
         },
 
-        syncSelectedStep() {
+        syncSelectedStep(this: any): void {
             const draft = this.selectedStepDraft;
             if (!draft) {
                 return;
@@ -236,17 +360,18 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
 
             // Copy all properties from draft to sourceStep (hook-safe)
             const internalProps = new Set(['nodeId']);
-            Object.keys(draft).forEach((key) => {
+            Object.keys(draft).forEach((key: string) => {
                 if (!internalProps.has(key)) {
-                    sourceStep[key] = typeof draft[key] === 'object' && draft[key] !== null
-                        ? JSON.parse(JSON.stringify(draft[key]))
-                        : draft[key];
+                    sourceStep[key] =
+                        typeof draft[key] === 'object' && draft[key] !== null
+                            ? JSON.parse(JSON.stringify(draft[key]))
+                            : draft[key];
                 }
             });
 
             // Ensure designer position is preserved
-            const posX = Number(sourceStep.ui && sourceStep.ui.designer && sourceStep.ui.designer.position && sourceStep.ui.designer.position.x) || 0;
-            const posY = Number(sourceStep.ui && sourceStep.ui.designer && sourceStep.ui.designer.position && sourceStep.ui.designer.position.y) || 0;
+            const posX = Number((sourceStep.ui?.designer?.position?.x as any) || 0) || 0;
+            const posY = Number((sourceStep.ui?.designer?.position?.y as any) || 0) || 0;
             if (!sourceStep.ui) {
                 sourceStep.ui = {};
             }
@@ -258,7 +383,7 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             this.invokeStepHook(sourceStep.type, 'afterSync', {
                 step: sourceStep,
                 draft: draft,
-                setHint: (hint) => {
+                setHint: (hint: string) => {
                     this.selectedStepHint = String(hint || '').trim();
                 }
             });
@@ -287,7 +412,7 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
 
             graphNode.class = this.getWorkflowNodeClass(sourceStep);
 
-            const nodeElement = document.querySelector('#node-' + selectedGraphNodeId);
+            const nodeElement = document.querySelector('#node-' + selectedGraphNodeId) as HTMLElement | null;
             if (nodeElement) {
                 nodeElement.className = 'drawflow-node ' + this.getWorkflowNodeClass(sourceStep);
             }
@@ -312,13 +437,13 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             this.refreshSelectedStepView();
         },
 
-        removeSelectedNode() {
+        removeSelectedNode(this: any): void {
             if (this.useFallbackCanvas) {
                 if (!this.selectedNodeId) {
                     return;
                 }
                 const normalizedSelectedId = this.normalizeNodeId(this.selectedNodeId);
-                this.steps = this.steps.filter((step) => this.normalizeNodeId(step.nodeId) !== normalizedSelectedId);
+                this.steps = this.steps.filter((step: any) => this.normalizeNodeId(step.nodeId) !== normalizedSelectedId);
                 this.selectedNodeId = this.steps[0] ? String(this.steps[0].nodeId) : null;
                 this.refreshSelectedStepView();
                 this.generate();
@@ -331,5 +456,5 @@ window.workflowDesignerPropertiesMixin = function workflowDesignerPropertiesMixi
             }
             this.editor.removeNodeId('node-' + this.selectedNodeId);
         }
-    });
+    } as WorkflowDesignerPropertiesApi);
 };

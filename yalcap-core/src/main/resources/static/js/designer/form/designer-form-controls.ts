@@ -1,58 +1,85 @@
-// @ts-check
 (function () {
-    const windowAny = /** @type {any} */ (window);
 
-    windowAny.formDesignerControls = {
-        isOptionWidget(widget) {
+    interface FormControl {
+        widget: string;
+        stateKey?: string;
+        name?: string;
+        label?: string;
+        localId?: string;
+        defaultValue?: any;
+        children?: FormControl[];
+        options?: ControlOption[];
+        // Autocomplete properties
+        autocompleteSourceType?: string;
+        autocompleteSourceUrl?: string;
+        autocompleteLabelField?: string;
+        autocompleteValueField?: string;
+        autocompleteSearchParam?: string;
+        [key: string]: any;
+    }
+
+    interface ControlOption {
+        label: string;
+        value: string;
+        autoValue: boolean;
+    }
+
+    interface DesignerHooks {
+        normalize?: (control: any, context: any) => any;
+        validate?: (control: any, errors: string[], context: any) => void;
+    }
+
+    const formDesignerControls = {
+        isOptionWidget(widget: string): boolean {
             return widget === 'select' || widget === 'autocomplete' || widget === 'radio' || widget === 'checkbox';
         },
 
-        isTemporalWidget(widget) {
+        isTemporalWidget(widget: string): boolean {
             return widget === 'date' || widget === 'datetime';
         },
 
-        isImageWidget(widget) {
+        isImageWidget(widget: string): boolean {
             return widget === 'image';
         },
 
-        isTableWidget(widget) {
+        isTableWidget(widget: string): boolean {
             return widget === 'table';
         },
 
-        isRepeatWidget(widget) {
+        isRepeatWidget(widget: string): boolean {
             return widget === 'repeat';
         },
 
-        isUploadWidget(widget) {
+        isUploadWidget(widget: string): boolean {
             return widget === 'upload';
         },
 
-        isMessageWidget(widget) {
+        isMessageWidget(widget: string): boolean {
             return widget === 'message';
         },
 
-        isButtonWidget(widget) {
+        isButtonWidget(widget: string): boolean {
             return widget === 'button';
         },
 
-        newControlPersistentId() {
+        newControlPersistentId(): string {
             if (window.crypto && typeof window.crypto.randomUUID === 'function') {
                 return window.crypto.randomUUID();
             }
 
             const seed = `${Date.now()}-${Math.random()}-${Math.random()}`;
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch: string) => {
                 const code = (seed.charCodeAt(Math.floor(Math.random() * seed.length)) + Math.floor(Math.random() * 16)) % 16;
                 const value = ch === 'x' ? code : ((code & 0x3) | 0x8);
                 return value.toString(16);
             });
         },
 
-        isGuid(value) {
+        isGuid(value: any): boolean {
             return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
         },
 
-        ensureControlId(value) {
+        ensureControlId(value: any): string {
             const candidate = String(value || '').trim();
             if (this.isGuid(candidate)) {
                 return candidate.toLowerCase();
@@ -60,7 +87,7 @@
             return this.newControlPersistentId();
         },
 
-        getControlDesignerHooks(widget) {
+        getControlDesignerHooks(widget: any): DesignerHooks | null {
             const key = String(widget || '').trim().toLowerCase();
             if (!key) {
                 return null;
@@ -76,7 +103,7 @@
 
         templatePattern: /{{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*}}/g,
 
-        supportsDefaultValue(widget) {
+        supportsDefaultValue(widget: any): boolean {
             return widget === 'text'
                 || widget === 'textarea'
                 || widget === 'number'
@@ -90,7 +117,7 @@
                 || widget === 'upload';
         },
 
-        hasExplicitDefaultValue(control) {
+        hasExplicitDefaultValue(control: any): boolean {
             if (!control || !this.supportsDefaultValue(control.widget)) {
                 return false;
             }
@@ -110,7 +137,7 @@
             return control.defaultValue !== null && control.defaultValue !== undefined && control.defaultValue !== '';
         },
 
-        escapeHtml(value) {
+        escapeHtml(value: any): string {
             return String(value || '')
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
@@ -119,19 +146,21 @@
                 .replace(/'/g, '&#39;');
         },
 
-        collectStateKeyMap(controls = this.controls, map = new Map()) {
+        collectStateKeyMap(controls?: any[], map?: Map<string, any>): Map<string, any> {
+            map = map || new Map();
+            controls = controls || (this as any).controls;
             if (!Array.isArray(controls)) {
                 return map;
             }
 
-            controls.forEach((control) => {
+            controls.forEach((control: any) => {
                 if (!control) {
                     return;
                 }
 
                 const key = (control.stateKey || '').trim();
                 if (key) {
-                    map.set(key, control);
+                    map!.set(key, control);
                 }
 
                 if (Array.isArray(control.children) && control.children.length > 0) {
@@ -142,11 +171,12 @@
             return map;
         },
 
-        templateValuesFromControls(controls = this.controls) {
-            const values = {};
+        templateValuesFromControls(controls?: any[]): Record<string, any> {
+            controls = controls || (this as any).controls;
+            const values: Record<string, any> = {};
             const map = this.collectStateKeyMap(controls);
 
-            map.forEach((control, key) => {
+            map.forEach((control: any, key: string) => {
                 if (control.widget === 'booleanCheckbox') {
                     values[key] = control.defaultValue === true ? 'true' : 'false';
                     return;
@@ -173,11 +203,11 @@
             return values;
         },
 
-        interpolateTemplateText(value, contextValues = null) {
+        interpolateTemplateText(value: any, contextValues?: any): string {
             const raw = String(value || '');
             const values = contextValues || this.templateValuesFromControls();
 
-            return raw.replace(this.templatePattern, (_, key) => {
+            return raw.replace(this.templatePattern, (_: string, key: string) => {
                 if (!Object.prototype.hasOwnProperty.call(values, key)) {
                     return '';
                 }
@@ -185,24 +215,24 @@
             });
         },
 
-        collectTemplateKeys(value) {
+        collectTemplateKeys(value: any): Set<string> {
             const raw = String(value || '');
-            const keys = new Set();
-            raw.replace(this.templatePattern, (_, key) => {
+            const keys = new Set<string>();
+            raw.replace(this.templatePattern, (_: string, key: string) => {
                 keys.add(key);
                 return '';
             });
             return keys;
         },
 
-        validateTemplateKeys(value, fieldLabel, knownKeys, errs) {
+        validateTemplateKeys(value: any, fieldLabel: string, knownKeys: Set<string>, errs: string[]): void {
             const keys = this.collectTemplateKeys(value);
             if (keys.size === 0) {
                 return;
             }
 
-            const unknownKeys = [];
-            keys.forEach((key) => {
+            const unknownKeys: string[] = [];
+            keys.forEach((key: string) => {
                 if (!knownKeys.has(key)) {
                     unknownKeys.push(key);
                 }
@@ -213,7 +243,7 @@
             }
         },
 
-        safeUrl(url) {
+        safeUrl(url: any): string {
             const raw = (url || '').trim();
             if (!raw) {
                 return '#';
@@ -228,24 +258,24 @@
             return '#';
         },
 
-        markdownToSafeHtml(markdown) {
+        markdownToSafeHtml(markdown: any): string {
             const lines = String(markdown || '').replace(/\r\n?/g, '\n').split('\n');
-            const out = [];
-            let listType = null;
+            const out: string[] = [];
+            let listType: string | null = null;
 
-            const applyInline = (line) => {
+            const applyInline = (line: string): string => {
                 let html = this.escapeHtml(line);
                 html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
                 html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
                 html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-                html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+                html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_: string, label: string, url: string) => {
                     const safe = this.escapeHtml(this.safeUrl(url));
                     return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>`;
                 });
                 return html;
             };
 
-            const closeListIfNeeded = () => {
+            const closeListIfNeeded = (): void => {
                 if (listType === 'ul') {
                     out.push('</ul>');
                     listType = null;
@@ -255,7 +285,7 @@
                 }
             };
 
-            lines.forEach((rawLine) => {
+            lines.forEach((rawLine: string) => {
                 const line = rawLine.trim();
                 if (!line) {
                     closeListIfNeeded();
@@ -300,14 +330,14 @@
             return out.join('');
         },
 
-        renderMessageBody(control) {
+        renderMessageBody(control: any): string {
             if (!control) {
                 return '';
             }
             return this.renderRichText(control.messageBody || '', control.messageFormat || 'markdown');
         },
 
-        renderRichText(value, format, contextValues = null) {
+        renderRichText(value: any, format: any, contextValues?: any): string {
             const normalizedFormat = (format || 'markdown').trim() || 'markdown';
             const interpolatedValue = this.interpolateTemplateText(value, contextValues);
             if (normalizedFormat === 'text') {
@@ -316,19 +346,19 @@
             return this.markdownToSafeHtml(interpolatedValue || '');
         },
 
-        isSectionWidget(widget) {
+        isSectionWidget(widget: any): boolean {
             return widget === 'section';
         },
 
-        isGroupWidget(widget) {
+        isGroupWidget(widget: any): boolean {
             return widget === 'group';
         },
 
-        isStateKeyPathContainerWidget(widget) {
+        isStateKeyPathContainerWidget(widget: any): boolean {
             return widget === 'group' || widget === 'repeat';
         },
 
-        composeStateKeyPath(parentPath, segment) {
+        composeStateKeyPath(parentPath: string, segment: string): string {
             const part = this.toIdentifier(segment || 'field');
             if (!parentPath) {
                 return part;
@@ -336,12 +366,14 @@
             return `${parentPath}.${part}`;
         },
 
-        applyDerivedStateKeys(controls = this.controls, parentPath = '') {
+        applyDerivedStateKeys(controls?: any[], parentPath?: string): void {
+            controls = controls || (this as any).controls;
+            parentPath = parentPath || '';
             if (!Array.isArray(controls)) {
                 return;
             }
 
-            controls.forEach((control) => {
+            controls.forEach((control: any) => {
                 if (!control) {
                     return;
                 }
@@ -349,7 +381,7 @@
                 const nameSeed = control.name || control.label || 'field';
                 control.name = this.toIdentifier(nameSeed);
 
-                const currentPath = this.composeStateKeyPath(parentPath, control.name);
+                const currentPath = this.composeStateKeyPath(parentPath!, control.name);
                 control.stateKey = currentPath;
 
                 if (!Array.isArray(control.children) || control.children.length === 0) {
@@ -363,11 +395,11 @@
             });
         },
 
-        recomputeDerivedStateKeys() {
-            this.applyDerivedStateKeys(this.controls, '');
+        recomputeDerivedStateKeys(): void {
+            this.applyDerivedStateKeys((this as any).controls, '');
         },
 
-        slugify(value) {
+        slugify(value: any): string {
             return (value || '')
                 .toString()
                 .trim()
@@ -376,7 +408,7 @@
                 .replace(/^_+|_+$/g, '') || 'value';
         },
 
-        toIdentifier(value) {
+        toIdentifier(value: any): string {
             const raw = (value || '').toString().trim();
             const tokens = raw
                 .replace(/[^A-Za-z0-9_$]+/g, ' ')
@@ -402,23 +434,25 @@
             return name || 'field';
         },
 
-        isJsSafeIdentifier(value) {
+        isJsSafeIdentifier(value: any): boolean {
             return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test((value || '').trim());
         },
 
-        isStateKey(value) {
+        isStateKey(value: any): boolean {
             return /^[A-Za-z][A-Za-z0-9_.-]*$/.test((value || '').trim());
         },
 
-        countStateKeyUsage(stateKey, excludeControlLocalId = null, controls = this.controls) {
+        countStateKeyUsage(stateKey: string, excludeControlLocalId?: string | null, controls?: any[]): number {
+            excludeControlLocalId = excludeControlLocalId || null;
+            controls = controls || (this as any).controls;
             const target = (stateKey || '').trim().toLowerCase();
             if (!target || !Array.isArray(controls)) {
                 return 0;
             }
 
             let count = 0;
-            const walk = (items) => {
-                items.forEach((item) => {
+            const walk = (items: any[]): void => {
+                items.forEach((item: any) => {
                     if (!item) {
                         return;
                     }
@@ -436,16 +470,16 @@
             return count;
         },
 
-        optionPairsFromRaw(optionsRaw) {
+        optionPairsFromRaw(optionsRaw: any): any[] {
             if (!optionsRaw) {
                 return [];
             }
 
             return optionsRaw
                 .split(',')
-                .map((entry) => entry.trim())
+                .map((entry: string) => entry.trim())
                 .filter(Boolean)
-                .map((entry) => {
+                .map((entry: string) => {
                     const eqIndex = entry.indexOf('=');
                     if (eqIndex === -1) {
                         return { label: entry, value: entry, autoValue: false };
@@ -458,7 +492,7 @@
                 });
         },
 
-        ensureOptionsArray(control) {
+        ensureOptionsArray(control: any): void {
             if (!control) {
                 return;
             }
@@ -469,14 +503,14 @@
             delete control.optionsRaw;
         },
 
-        createDefaultOptions() {
+        createDefaultOptions(): any[] {
             return [
                 { label: 'Option 1', value: 'option_1', autoValue: true },
                 { label: 'Option 2', value: 'option_2', autoValue: true }
             ];
         },
 
-        normalizeControl(control) {
+        normalizeControl(control: any): any {
             if (!control) {
                 return control;
             }
@@ -487,7 +521,7 @@
                 normalized.options = [];
             }
 
-            normalized.localId = String(normalized.localId || (typeof this.newControlLocalId === 'function' ? this.newControlLocalId() : 'ctrl-fallback')).trim();
+            normalized.localId = String(normalized.localId || (typeof (this as any).newControlLocalId === 'function' ? (this as any).newControlLocalId() : 'ctrl-fallback')).trim();
             normalized.nameManual = normalized.nameManual === true;
             normalized.id = this.ensureControlId(normalized.id);
             normalized.name = this.toIdentifier(normalized.name || normalized.label || 'field');
@@ -528,11 +562,11 @@
                     normalized.options = this.createDefaultOptions();
                 }
                 if (Array.isArray(normalized.defaultValue)) {
-                    normalized.defaultValue = normalized.defaultValue.map((v) => String(v)).filter(Boolean);
+                    normalized.defaultValue = normalized.defaultValue.map((v: any) => String(v)).filter(Boolean);
                 } else if (typeof normalized.defaultValue === 'string' && normalized.defaultValue.trim()) {
                     normalized.defaultValue = normalized.defaultValue
                         .split(',')
-                        .map((v) => v.trim())
+                        .map((v: string) => v.trim())
                         .filter(Boolean);
                 } else {
                     normalized.defaultValue = [];
@@ -593,7 +627,7 @@
                 const kind = String(normalized.numberKind || '').trim().toLowerCase();
                 normalized.numberKind = kind === 'integer' ? 'integer' : 'decimal';
 
-                const toNumberOrNull = (value) => {
+                const toNumberOrNull = (value: any): number | null => {
                     if (value === '' || value === null || value === undefined) {
                         return null;
                     }
@@ -660,11 +694,11 @@
 
                 if (normalized.uploadAllowMultiple === true) {
                     if (Array.isArray(normalized.defaultValue)) {
-                        normalized.defaultValue = normalized.defaultValue.map((v) => String(v)).filter(Boolean);
+                        normalized.defaultValue = normalized.defaultValue.map((v: any) => String(v)).filter(Boolean);
                     } else if (typeof normalized.defaultValue === 'string' && normalized.defaultValue.trim()) {
                         normalized.defaultValue = normalized.defaultValue
                             .split(',')
-                            .map((v) => v.trim())
+                            .map((v: string) => v.trim())
                             .filter(Boolean);
                     } else {
                         normalized.defaultValue = [];
@@ -777,7 +811,7 @@
                 normalized.groupDescription = (normalized.groupDescription || '').trim();
             }
 
-            normalized.options = normalized.options.map((opt) => ({
+            normalized.options = normalized.options.map((opt: any) => ({
                 label: (opt.label || '').trim(),
                 value: (opt.value || '').trim(),
                 autoValue: opt.autoValue !== false
@@ -786,14 +820,14 @@
             return normalized;
         },
 
-        validateControl(control) {
-            const errs = [];
+        validateControl(control: any): string[] {
+            const errs: string[] = [];
             if (!control) {
                 return errs;
             }
 
-            const knownKeys = new Set();
-            this.collectStateKeyMap(this.controls).forEach((_, key) => knownKeys.add(key));
+            const knownKeys = new Set<string>();
+            this.collectStateKeyMap((this as any).controls).forEach((_: any, key: string) => knownKeys.add(key));
 
             if (!control.name || !control.name.trim()) {
                 if (!this.isImageWidget(control.widget) && !this.isSectionWidget(control.widget) && !this.isMessageWidget(control.widget) && !this.isButtonWidget(control.widget)) {
@@ -826,13 +860,13 @@
                 errs.push('Select, autocomplete, radio, and checkbox controls require at least one option.');
             }
 
-            const malformed = options.filter((o) => !o.label || !o.value);
+            const malformed = options.filter((o: any) => !o.label || !o.value);
             if (malformed.length > 0) {
                 errs.push('Each option must include both label and value.');
             }
 
             if (normalized.type === 'number' && options.length > 0) {
-                const nonNumeric = options.filter((o) => Number.isNaN(Number(o.value)));
+                const nonNumeric = options.filter((o: any) => Number.isNaN(Number(o.value)));
                 if (nonNumeric.length > 0) {
                     errs.push('Number controls must have numeric option values only.');
                 }
@@ -843,9 +877,9 @@
             }
 
             if (normalized.widget === 'checkbox') {
-                const allowedValues = new Set(options.map((o) => o.value));
+                const allowedValues = new Set(options.map((o: any) => o.value));
                 const defaults = Array.isArray(normalized.defaultValue) ? normalized.defaultValue : [];
-                const invalidDefaults = defaults.filter((v) => !allowedValues.has(String(v)));
+                const invalidDefaults = defaults.filter((v: any) => !allowedValues.has(String(v)));
                 if (invalidDefaults.length > 0) {
                     errs.push('Checkbox default values must exist in option values.');
                 }
@@ -853,7 +887,7 @@
 
             if (normalized.widget === 'select' || normalized.widget === 'autocomplete' || normalized.widget === 'radio') {
                 if (normalized.defaultValue) {
-                    const allowedValues = new Set(options.map((o) => o.value));
+                    const allowedValues = new Set(options.map((o: any) => o.value));
                     if (!allowedValues.has(String(normalized.defaultValue))) {
                         errs.push('Default value must exist in option values.');
                     }
@@ -940,7 +974,7 @@
                     errs.push('Number step must be greater than 0 when provided.');
                 }
 
-                const isIntegerLike = (value) => {
+                const isIntegerLike = (value: any): boolean => {
                     if (value === null || value === undefined) {
                         return true;
                     }
@@ -1049,6 +1083,10 @@
             this.validateTemplateKeys(normalized.help, 'Help', knownKeys, errs);
 
             return errs;
-        }
+        },
+
+        controls: [] as any[]
     };
+
+    windowAny.formDesignerControls = formDesignerControls;
 })();

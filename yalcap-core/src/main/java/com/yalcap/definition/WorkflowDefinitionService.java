@@ -85,6 +85,11 @@ public class WorkflowDefinitionService {
         validateStepDefinitions(definition);
         validateAndNormalizeRuleActions(definition);
 
+        String title = extractTitle(definition);
+        if (title.isEmpty()) {
+            title = workflowKey;
+        }
+
         ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
         String yamlDefinition = yamlMapper.writeValueAsString(definition);
         definitionFilesystem.writeWorkflowDefinition(workflowKey, yamlDefinition);
@@ -99,6 +104,7 @@ public class WorkflowDefinitionService {
         WorkflowDefinitionEntity published = new WorkflowDefinitionEntity(
                 null,
                 workflowKey,
+                title,
                 definition,
                 nextVersion,
                 true,
@@ -330,6 +336,17 @@ public class WorkflowDefinitionService {
                 validateHexColor(custom, color);
             }
         }
+    }
+
+    private String extractTitle(JsonNode definition) {
+        if (definition == null || !definition.isObject()) {
+            return "";
+        }
+        JsonNode titleNode = definition.path("title");
+        if (titleNode.isString()) {
+            return titleNode.asString("").trim();
+        }
+        return "";
     }
 
     // ============ RUNTIME HELPERS ============
