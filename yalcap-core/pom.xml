@@ -152,8 +152,8 @@
 							<goal>install-node-and-npm</goal>
 						</goals>
 						<configuration>
-							<nodeVersion>v20.10.0</nodeVersion>
-							<npmVersion>10.2.4</npmVersion>
+							<nodeVersion>v24.19.0</nodeVersion>
+							<npmVersion>11.17.0</npmVersion>
 						</configuration>
 					</execution>
 					<execution>
@@ -172,6 +172,17 @@
 						</goals>
 						<configuration>
 							<arguments>run build</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>npm-test</id>
+						<goals>
+							<goal>npm</goal>
+						</goals>
+						<phase>test</phase>
+						<configuration>
+							<arguments>run test:run</arguments>
+        					<skip>true</skip>
 						</configuration>
 					</execution>
 				</executions>

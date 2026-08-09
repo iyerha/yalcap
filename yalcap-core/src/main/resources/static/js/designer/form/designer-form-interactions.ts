@@ -1,8 +1,3 @@
-(function () {
-    const windowAny = window as any;
+import { formDesignerInteractions } from './designer-form-interactions.module.js';
 
-    const implementation = windowAny.formDesignerInteractionsImpl || {};
-    windowAny.formDesignerInteractions = {
-        ...implementation
-    };
-})();
+(window as any).formDesignerInteractions = formDesignerInteractions;

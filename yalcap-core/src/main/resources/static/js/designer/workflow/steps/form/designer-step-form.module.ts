@@ -1,0 +1,272 @@
+interface EnumValue {
+    label: string;
+    value: string;
+}
+
+interface CustomField {
+    section: string;
+    key: string;
+    title: string;
+    type: 'select' | 'text' | 'checkbox' | 'autocomplete';
+    enumValues?: EnumValue[] | string[];
+    placeholder?: string;
+}
+
+interface Assignment {
+    kind: string;
+    value: string;
+    mode: string;
+    multiInstance: boolean;
+}
+
+interface AccessControl {
+    groups: string[];
+    users: string[];
+}
+
+interface FormStepContext {
+    draft?: Record<string, unknown>;
+    step?: Record<string, unknown>;
+    setHint?: (hint: string) => void;
+}
+
+interface FormSearchResult {
+    key: string;
+    title: string;
+}
+
+export interface FormStepHook {
+    customFields: CustomField[];
+    formSearchQuery: string;
+    formSearchResults: FormSearchResult[];
+    formSearchOpen: boolean;
+    searchForms: (query: string) => Promise<void>;
+    selectFormReference: (formKey: string) => void;
+    updateFieldValue?: (section: string, key: string, value: unknown) => void;
+    onSelect: (context: FormStepContext) => void;
+    afterSync: (context: FormStepContext) => void;
+}
+
+export function resolveHint(assignment: unknown): string {
+    const values: any = assignment && typeof assignment === 'object' ? assignment : {};
+    const kind = String(values.kind || '').trim();
+    const value = String(values.value || '').trim();
+
+    if (!kind) {
+        return 'Form step: choose an assignment kind.';
+    }
+
+    if (!value) {
+        return 'Form step: provide an assignment value for ' + kind + '.';
+    }
+
+    if (kind === 'EXTERNAL_EMAIL' && (value as string).indexOf('@') < 0) {
+        return 'Form step: EXTERNAL_EMAIL usually contains an email or expression that resolves to one.';
+    }
+
+    return 'Form step assignment looks complete.';
+}
+
+export function ensureAssignmentObject(obj: any): void {
+    if (!obj || typeof obj !== 'object') {
+        return;
+    }
+    if (!obj.assignment || typeof obj.assignment !== 'object') {
+        obj.assignment = {
+            kind: 'INTERNAL_USER',
+            value: '',
+            mode: 'first-wins',
+            multiInstance: false
+        };
+    } else {
+        if (!('kind' in obj.assignment)) obj.assignment.kind = 'INTERNAL_USER';
+        if (!('value' in obj.assignment)) obj.assignment.value = '';
+        if (!('mode' in obj.assignment)) obj.assignment.mode = 'first-wins';
+        if (!('multiInstance' in obj.assignment)) obj.assignment.multiInstance = false;
+    }
+}
+
+export function ensureAccessObject(obj: any): void {
+    if (!obj || typeof obj !== 'object') {
+        return;
+    }
+    if (!obj.access || typeof obj.access !== 'object') {
+        obj.access = { groups: [], users: [] };
+    } else {
+        if (!Array.isArray(obj.access.groups)) obj.access.groups = [];
+        if (!Array.isArray(obj.access.users)) obj.access.users = [];
+    }
+}
+
+export function ensureUiObject(obj: any): void {
+    if (!obj || typeof obj !== 'object') {
+        return;
+    }
+    if (!obj.ui || typeof obj.ui !== 'object') {
+        obj.ui = { pointer: '', designer: { position: { x: 0, y: 0 } } };
+    } else if (!obj.ui.pointer) {
+        obj.ui.pointer = '';
+    }
+}
+
+export function createFormStepHook(): FormStepHook {
+    return {
+        customFields: [
+            {
+                section: 'assignment',
+                key: 'kind',
+                title: 'Assignment Kind',
+                type: 'select',
+                enumValues: [
+                    { label: 'Internal User', value: 'INTERNAL_USER' },
+                    { label: 'Internal Group', value: 'INTERNAL_GROUP' },
+                    { label: 'External Email', value: 'EXTERNAL_EMAIL' }
+                ]
+            },
+            {
+                section: 'assignment',
+                key: 'value',
+                title: 'Assignment Value',
+                type: 'text',
+                placeholder: 'User ID, group, or email'
+            },
+            {
+                section: 'assignment',
+                key: 'mode',
+                title: 'Assignment Mode',
+                type: 'select',
+                enumValues: ['SINGLE', 'ALL']
+            },
+            { section: 'assignment', key: 'multiInstance', title: 'Multi Instance', type: 'checkbox' },
+            {
+                section: 'access',
+                key: 'groups',
+                title: 'Allowed Groups',
+                type: 'text',
+                placeholder: 'Comma-separated group IDs'
+            },
+            {
+                section: 'access',
+                key: 'users',
+                title: 'Allowed Users',
+                type: 'text',
+                placeholder: 'Comma-separated user IDs'
+            },
+            {
+                section: 'ui',
+                key: 'pointer',
+                title: 'Form Reference',
+                type: 'autocomplete',
+                placeholder: 'Search forms...'
+            }
+        ] as CustomField[],
+        formSearchQuery: '',
+        formSearchResults: [] as FormSearchResult[],
+        formSearchOpen: false,
+
+        async searchForms(this: any, query: string): Promise<void> {
+            this.formSearchQuery = String(query || '').trim();
+
+            if (!this.formSearchQuery) {
+                this.formSearchResults = [];
+                this.formSearchOpen = false;
+                return;
+            }
+
+            try {
+                const tenantId = (window as any).tenantId;
+                const response = await fetch(
+                    `/api/definitions?type=form&search=${encodeURIComponent(this.formSearchQuery)}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-Tenant-Id': tenantId
+                        }
+                    }
+                );
+
+                if (!response.ok) {
+                    this.formSearchResults = [];
+                    return;
+                }
+
+                const data = await response.json();
+                this.formSearchResults = Array.isArray(data.definitions)
+                    ? data.definitions.map((def: any) => ({
+                        key: String(def.key || def.id),
+                        title: String(def.title || def.key)
+                    }))
+                    : [];
+                this.formSearchOpen = this.formSearchResults.length > 0;
+            } catch (error) {
+                console.warn('Failed to search forms', error);
+                this.formSearchResults = [];
+            }
+        },
+
+        selectFormReference(this: any, formKey: string): void {
+            this.updateFieldValue('ui', 'pointer', formKey);
+            this.formSearchOpen = false;
+            this.formSearchQuery = '';
+            this.formSearchResults = [];
+        },
+
+        onSelect(this: any, context: FormStepContext): void {
+            if (!context || !context.draft) {
+                return;
+            }
+
+            const draft = context.draft;
+            const sourceStep = context.step;
+
+            ensureAssignmentObject(draft);
+            ensureAccessObject(draft);
+            ensureUiObject(draft);
+
+            if (sourceStep) {
+                if (sourceStep.assignment && typeof sourceStep.assignment === 'object') {
+                    draft.assignment = JSON.parse(JSON.stringify(sourceStep.assignment));
+                }
+                if (sourceStep.access && typeof sourceStep.access === 'object') {
+                    draft.access = JSON.parse(JSON.stringify(sourceStep.access));
+                }
+                if (sourceStep.ui && typeof sourceStep.ui === 'object' && (sourceStep.ui as any).pointer) {
+                    if (!draft.ui) {
+                        draft.ui = {};
+                    }
+                    (draft.ui as any).pointer = String((sourceStep.ui as any).pointer || '');
+                }
+            }
+
+            if (typeof context.setHint === 'function') {
+                context.setHint(resolveHint((draft as any).assignment));
+            }
+        },
+
+        afterSync(this: any, context: FormStepContext): void {
+            if (!context || !context.step) {
+                return;
+            }
+
+            const step = context.step;
+            ensureAssignmentObject(step);
+            ensureAccessObject(step);
+            ensureUiObject(step);
+
+            if (typeof context.setHint === 'function') {
+                context.setHint(resolveHint((step as any).assignment));
+            }
+        }
+    };
+}
+
+export function register(registerFn?: (name: string, hook: FormStepHook) => void): void {
+    const target = registerFn || (window as any).registerWorkflowStepHook;
+    
+    if (typeof target !== 'function') {
+        return;
+    }
+
+    target('form', createFormStepHook());
+}

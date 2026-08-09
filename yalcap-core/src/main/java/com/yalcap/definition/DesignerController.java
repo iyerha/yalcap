@@ -142,7 +142,11 @@ public class DesignerController {
         UUID tenantId = TenantContext.requireTenantId();
         model.addAttribute("tenantId", tenantId);
         addDesignerAssets(model, false);
-        formDefinitionService.getActiveDefinition(key).ifPresent(entity -> model.addAttribute("activeDefinition", entity));
+        formDefinitionService.getActiveDefinition(key).ifPresent(entity -> {
+            model.addAttribute("activeDefinition", entity);
+            model.addAttribute("controlSchemaJson", entity.getControlSchema());
+            model.addAttribute("dataSchemaJson", objectMapper.writeValueAsString(entity.getDataSchema()));
+        });
         return "designer/form";
     }
 
@@ -201,6 +205,7 @@ public class DesignerController {
     private void addDesignerAssets(Model model, boolean includeStepAssets) {
         Set<String> designerJs = new LinkedHashSet<>();
         Set<String> designerCss = new LinkedHashSet<>();
+        Set<String> runtimeJs = new LinkedHashSet<>();
 
         for (ControlTypeDescriptor descriptor : controlTypeRegistry.descriptors()) {
             if (descriptor == null) {
@@ -214,6 +219,7 @@ public class DesignerController {
 
             addAssets(designerJs, assets.designerJs());
             addAssets(designerCss, assets.designerCss());
+            addAssets(runtimeJs, assets.runtimeJs());
         }
 
         if (includeStepAssets) {
@@ -234,6 +240,7 @@ public class DesignerController {
 
         model.addAttribute("designerJsAssets", new ArrayList<>(designerJs));
         model.addAttribute("designerCssAssets", new ArrayList<>(designerCss));
+        model.addAttribute("runtimeJsAssets", new ArrayList<>(runtimeJs));
     }
 
     private void addAssets(Set<String> target, List<String> assets) {

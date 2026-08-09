@@ -1,16 +1,5 @@
-interface RulesApi {
-    [key: string]: any;
-}
+import { formDesignerRulesImpl } from './designer-form-rules-impl.module.js';
 
-(function initFormDesignerRules(windowAny: Window & typeof globalThis): void {
-    const host = windowAny as any;
-    const tableApi = host.formDesignerRulesTable || {};
-    const utilsApi = host.formDesignerRulesUtils || {};
-    const compileApi = host.formDesignerRulesCompile || {};
+export const formDesignerRules = formDesignerRulesImpl;
 
-    host.formDesignerRules = {
-        ...tableApi,
-        ...utilsApi,
-        ...compileApi
-    };
-})(window);
+(window as any).formDesignerRules = formDesignerRules;

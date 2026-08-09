@@ -2,7 +2,6 @@
   "compilerOptions": {
     "target": "ES2021",
     "module": "es2020",
-    "moduleResolution": "node",
     "outDir": "target/classes/static/js",
     "rootDir": "src/main/resources/static/js",
     "noImplicitAny": true,
@@ -18,5 +17,10 @@
   "include": [
     "src/main/resources/static/js/**/*.ts"
   ],
-  "exclude": ["target", "node_modules"]
+  "exclude": ["target", "node_modules", "**/*.test.ts", "**/*.spec.ts"],
+  "watchOptions": {
+    "watchFile": "fixedPollingInterval",
+    "watchDirectory": "fixedPollingInterval",
+    "fallbackPolling": "fixedInterval"
+  }
 }
